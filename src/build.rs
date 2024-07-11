@@ -59,7 +59,6 @@ fn search_from_pos(
     }];
 
     let mut visited = vec![false; (grid.width() * grid.height()) as usize];
-    let mut word = String::new();
 
     while let Some(mut entry) = stack.pop() {
         if entry.x >= grid.width() ||
@@ -71,7 +70,6 @@ fn search_from_pos(
             // Backtrack
             while let Some(entry) = stack.pop() {
                 visited[(entry.y * grid.width() + entry.x) as usize] = false;
-                word.pop().unwrap();
 
                 if entry.next_direction < DIRECTIONS.len() {
                     stack.push(entry);
@@ -82,13 +80,16 @@ fn search_from_pos(
             let letter = grid.at(entry.x, entry.y);
             let next_walker = entry.walker.step(letter).unwrap();
 
-            word.push(letter);
             visited[(entry.y * grid.width() + entry.x) as usize] = true;
 
             let word_length = stack.len() + 1;
 
             if word_length >= minimum_length && next_walker.is_end() {
-                word_list.insert(word.clone());
+                let mut word = stack.iter().map(|entry| {
+                    grid.at(entry.x, entry.y)
+                }).collect::<String>();
+                word.push(letter);
+                word_list.insert(word);
             }
 
             let next_offset = DIRECTIONS[entry.next_direction];
