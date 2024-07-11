@@ -26,6 +26,8 @@ use clap::Parser;
 struct Cli {
     #[arg(short, long, value_name = "FILE")]
     dictionary: OsString,
+    #[arg(short, long, value_name = "LENGTH", default_value_t = 4)]
+    minimum_length: usize,
 }
 
 fn main() -> ExitCode {
@@ -57,7 +59,7 @@ fn main() -> ExitCode {
         },
     };
 
-    let words = build::search_words(&grid, &dictionary);
+    let words = build::search_words(&grid, &dictionary, cli.minimum_length);
 
     let mut words = words.into_iter().collect::<Vec<_>>();
     words.sort();

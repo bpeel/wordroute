@@ -41,6 +41,7 @@ struct StackEntry<'a> {
 fn search_from_pos(
     grid: &Grid,
     dictionary: &dictionary::Dictionary,
+    minimum_length: usize,
     x: u32,
     y: u32,
     word_list: &mut HashSet<String>,
@@ -84,7 +85,9 @@ fn search_from_pos(
             word.push(letter);
             visited[(entry.y * grid.width() + entry.x) as usize] = true;
 
-            if next_walker.is_end() {
+            let word_length = stack.len() + 1;
+
+            if word_length >= minimum_length && next_walker.is_end() {
                 word_list.insert(word.clone());
             }
 
@@ -108,12 +111,19 @@ fn search_from_pos(
 pub fn search_words(
     grid: &Grid,
     dictionary: &dictionary::Dictionary,
+    minimum_length: usize,
 ) -> HashSet<String> {
     let mut word_list = HashSet::new();
 
     for y in 0..grid.height() {
         for x in 0..grid.width() {
-            search_from_pos(grid, dictionary, x, y, &mut word_list);
+            search_from_pos(
+                grid,
+                dictionary,
+                minimum_length,
+                x, y,
+                &mut word_list,
+            );
         }
     }
 
@@ -142,10 +152,11 @@ mod test {
         dictionary::Dictionary::new(Box::new(DICTIONARY_BYTES.clone()))
     }
 
-    fn search(grid: &str) -> Vec<String> {
+    fn search(grid: &str, minimum_length: usize) -> Vec<String> {
         let mut words = search_words(
             &Grid::new(grid).unwrap(),
             &make_dictionary(),
+            minimum_length,
         ).into_iter().collect::<Vec<_>>();
 
         words.sort_unstable();
@@ -155,12 +166,13 @@ mod test {
 
     #[test]
     fn simple() {
-        assert_eq!(&search("cab"), &["cab"]);
-        assert_eq!(&search("start"), &["start"]);
+        assert_eq!(&search("cab", 3), &["cab"]);
+        assert_eq!(&search("start", 3), &["start"]);
         assert_eq!(
             &search(
                 "cabs\n\
-                 trat"
+                 trat",
+                3,
             ),
             &["cab", "start"],
         );
@@ -172,12 +184,14 @@ mod test {
             &search(
                 " st\n\
                  xra",
+                3,
             ).is_empty(),
         );
         assert_eq!(
             &search(
                 " st\n\
                  tra",
+                3,
             ),
             &["start"],
         );
@@ -190,6 +204,7 @@ mod test {
                 "  c  \n\
                  start\n\
                  xxb",
+                3,
             ),
             &["cab", "start"],
         );
@@ -197,16 +212,17 @@ mod test {
 
     #[test]
     fn all_directions() {
-        assert_eq!(&search("start"), &["start"]);
-        assert_eq!(&search("trats"), &["start"]);
-        assert_eq!(&search("s\nt\na\nr\nt"), &["start"]);
-        assert_eq!(&search("t\nr\na\nt\ns"), &["start"]);
+        assert_eq!(&search("start", 3), &["start"]);
+        assert_eq!(&search("trats", 3), &["start"]);
+        assert_eq!(&search("s\nt\na\nr\nt", 3), &["start"]);
+        assert_eq!(&search("t\nr\na\nt\ns", 3), &["start"]);
 
         assert_eq!(
             &search(
                 "cxx\n\
                  xax\n\
                  xxb",
+                3,
             ),
             &["cab"],
         );
@@ -215,6 +231,7 @@ mod test {
                 "xxc\n\
                  xax\n\
                  bxx",
+                3,
             ),
             &["cab"],
         );
@@ -223,6 +240,7 @@ mod test {
                 "xxb\n\
                  xax\n\
                  cxx",
+                3,
             ),
             &["cab"],
         );
@@ -231,8 +249,15 @@ mod test {
                 "bxx\n\
                  xax\n\
                  xxc",
+                3,
             ),
             &["cab"],
         );
+    }
+
+    #[test]
+    fn minimum_length() {
+        assert!(&search("cab", 4).is_empty());
+        assert_eq!(&search("cab", 3), &["cab"]);
     }
 }
