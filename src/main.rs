@@ -17,6 +17,7 @@
 mod grid;
 mod build;
 mod dictionary;
+mod directions;
 
 use std::{fs, process::ExitCode, ffi::OsString};
 use clap::Parser;

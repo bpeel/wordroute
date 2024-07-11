@@ -16,20 +16,8 @@
 
 use super::grid::Grid;
 use super::dictionary;
+use super::directions::DIRECTIONS;
 use std::collections::HashSet;
-
-static DIRECTIONS: [(i32, i32); 8] = [
-    (-1, -1),
-    (0, -1),
-    (1, -1),
-
-    (-1, 0),
-    (1, 0),
-
-    (-1, 1),
-    (0, 1),
-    (1, 1),
-];
 
 struct StackEntry<'a> {
     x: u32,
