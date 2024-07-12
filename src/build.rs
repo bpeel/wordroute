@@ -53,7 +53,6 @@ fn search_from_pos(
     while let Some(mut entry) = stack.pop() {
         if entry.x >= grid.width() ||
             entry.y >= grid.height() ||
-            grid.at(entry.x, entry.y) == ' ' ||
             visited[(entry.y * grid.width() + entry.x) as usize] ||
             entry.walker.step(grid.at(entry.x, entry.y)).is_none()
         {
