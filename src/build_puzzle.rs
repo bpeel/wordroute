@@ -21,14 +21,19 @@ mod directions;
 mod word_finder;
 mod counts;
 
+use std::path::Path;
+use std::io::{BufReader, BufRead};
 use std::{fs, process::ExitCode, ffi::OsString};
 use clap::Parser;
+use std::collections::HashSet;
 
 #[derive(Parser)]
 #[command(name = "Build")]
 struct Cli {
     #[arg(short, long, value_name = "FILE")]
     dictionary: OsString,
+    #[arg(short, long, value_name = "FILE")]
+    bonus_words: Option<OsString>,
     #[arg(short, long, value_name = "LENGTH", default_value_t = 4)]
     minimum_length: usize,
     #[arg(short, long)]
@@ -56,13 +61,20 @@ fn print_text(
     grid: &grid::Grid,
     counts: &counts::GridCounts,
     words: Vec<String>,
+    bonus_words: &HashSet<String>,
 ) {
     print_grid(&grid, &counts);
 
     println!();
 
     for word in words.into_iter() {
-        println!("{}", word);
+        print!("{}", &word);
+
+        if bonus_words.contains(&word) {
+            print!(" (bonus)");
+        }
+
+        println!();
     }
 }
 
@@ -70,6 +82,7 @@ fn print_json(
     grid: &grid::Grid,
     counts: &counts::GridCounts,
     words: Vec<String>,
+    bonus_words: &HashSet<String>,
 ) {
     print!("{{\"grid\":\"");
 
@@ -101,12 +114,33 @@ fn print_json(
             print!(",");
         }
 
-        let word_type = 0;
+        let word_type = if bonus_words.contains(&word) {
+            1
+        } else {
+            0
+        };
 
         print!("\"{}\":{}", word, word_type);
     }
 
     println!("}}}}");
+}
+
+fn read_bonus_words<P: AsRef<Path>>(
+    filename: P,
+) -> Result<HashSet<String>, std::io::Error> {
+    let mut words = HashSet::new();
+
+    for line in BufReader::new(std::fs::File::open(filename)?).lines() {
+        let line = line?;
+        let line = line.trim();
+
+        if !line.is_empty() && !line.starts_with('#') {
+            words.insert(line.to_string());
+        }
+    }
+
+    Ok(words)
 }
 
 fn main() -> ExitCode {
@@ -118,6 +152,19 @@ fn main() -> ExitCode {
             eprintln!("{}: {}", cli.dictionary.to_string_lossy(), e);
             return ExitCode::FAILURE;
         },
+    };
+
+    let bonus_words = match cli.bonus_words {
+        Some(filename) => {
+            match read_bonus_words(&filename) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("{}: {}", filename.to_string_lossy(), e);
+                    return ExitCode::FAILURE;
+                },
+            }
+        },
+        None => HashSet::new(),
     };
 
     let dictionary = dictionary::Dictionary::new(dictionary.into_boxed_slice());
@@ -139,14 +186,17 @@ fn main() -> ExitCode {
     };
 
     let words = build::search_words(&grid, &dictionary, cli.minimum_length);
-    let mut words = words.into_iter().collect::<Vec<_>>();
+    let mut words = words.into_iter().collect::<Vec<String>>();
     words.sort();
-    let counts = build::count_visits(&grid, words.iter());
+    let counts = build::count_visits(
+        &grid,
+        words.iter().filter(|&word| !bonus_words.contains::<str>(word)),
+    );
 
     if cli.text {
-        print_text(&grid, &counts, words);
+        print_text(&grid, &counts, words, &bonus_words);
     } else {
-        print_json(&grid, &counts, words);
+        print_json(&grid, &counts, words, &bonus_words);
     }
 
     ExitCode::SUCCESS
