@@ -31,6 +31,8 @@ struct Cli {
     dictionary: OsString,
     #[arg(short, long, value_name = "LENGTH", default_value_t = 4)]
     minimum_length: usize,
+    #[arg(short, long)]
+    text: bool,
 }
 
 fn print_grid(grid: &grid::Grid, counts: &counts::GridCounts) {
@@ -48,6 +50,63 @@ fn print_grid(grid: &grid::Grid, counts: &counts::GridCounts) {
 
         println!();
     }
+}
+
+fn print_text(
+    grid: &grid::Grid,
+    counts: &counts::GridCounts,
+    words: Vec<String>,
+) {
+    print_grid(&grid, &counts);
+
+    println!();
+
+    for word in words.into_iter() {
+        println!("{}", word);
+    }
+}
+
+fn print_json(
+    grid: &grid::Grid,
+    counts: &counts::GridCounts,
+    words: Vec<String>,
+) {
+    print!("{{\"grid\":\"");
+
+    for y in 0..grid.height() {
+        for x in 0..grid.width() {
+            print!("{}", grid.at(x, y));
+        }
+        if y < grid.height() - 1 {
+            print!("\\n");
+        }
+    }
+
+    print!("\",\"counts\":[");
+
+    for y in 0..grid.height() {
+        for x in 0..grid.width() {
+            if x != 0 || y != 0 {
+                print!(",");
+            }
+            let count = counts.at(x, y);
+            print!("{},{}", count.starts, count.visits);
+        }
+    }
+
+    print!("],\"words\":{{");
+
+    for (i, word) in words.into_iter().enumerate() {
+        if i != 0 {
+            print!(",");
+        }
+
+        let word_type = 0;
+
+        print!("\"{}\":{}", word, word_type);
+    }
+
+    println!("}}}}");
 }
 
 fn main() -> ExitCode {
@@ -80,17 +139,14 @@ fn main() -> ExitCode {
     };
 
     let words = build::search_words(&grid, &dictionary, cli.minimum_length);
-    let counts = build::count_visits(&grid, words.iter());
-
-    print_grid(&grid, &counts);
-
-    println!();
-
     let mut words = words.into_iter().collect::<Vec<_>>();
     words.sort();
+    let counts = build::count_visits(&grid, words.iter());
 
-    for word in words.into_iter() {
-        println!("{}", word);
+    if cli.text {
+        print_text(&grid, &counts, words);
+    } else {
+        print_json(&grid, &counts, words);
     }
 
     ExitCode::SUCCESS
