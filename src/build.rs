@@ -203,14 +203,14 @@ mod test {
     fn no_reuse() {
         assert!(
             &search(
-                " st\n\
+                ".st\n\
                  xra",
                 3,
             ).is_empty(),
         );
         assert_eq!(
             &search(
-                " st\n\
+                ".st\n\
                  tra",
                 3,
             ),
@@ -222,7 +222,7 @@ mod test {
     fn cross() {
         assert_eq!(
             &search(
-                "  c  \n\
+                "..c..\n\
                  start\n\
                  xxb",
                 3,

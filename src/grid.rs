@@ -39,9 +39,9 @@ impl fmt::Display for Error {
 impl Grid {
     pub fn new(s: &str) -> Result<Grid, Error> {
         // Find the longest line
-        let width = s.lines().map(|line| line.trim_end().chars().count())
-            .max()
-            .unwrap_or(0);
+        let width = s.lines().map(|line| {
+            line.chars().filter(|ch| !ch.is_whitespace()).count()
+        }).max().unwrap_or(0);
 
         if width < 1 {
             return Err(Error::EmptyGrid);
@@ -53,15 +53,14 @@ impl Grid {
             let line = line.trim_end();
 
             if !line.is_empty() {
-                values.resize(row * width, ' ');
+                values.resize(row * width, '.');
+                values.extend(line.chars().filter(|ch| !ch.is_whitespace()));
             }
-
-            values.extend(line.chars());
         }
 
         let height = (values.len() + width - 1) / width;
 
-        values.resize(width * height, ' ');
+        values.resize(width * height, '.');
 
         Ok(Grid {
             values: values.into_boxed_slice(),
@@ -123,9 +122,9 @@ mod test {
         assert_eq!(grid.at(0, 0), 'a');
         assert_eq!(grid.at(1, 0), 'b');
         assert_eq!(grid.at(0, 1), 'c');
-        assert_eq!(grid.at(1, 1), ' ');
+        assert_eq!(grid.at(1, 1), '.');
         assert_eq!(grid.at(0, 2), 'd');
-        assert_eq!(grid.at(1, 2), ' ');
+        assert_eq!(grid.at(1, 2), '.');
     }
 
     #[test]
@@ -145,5 +144,22 @@ mod test {
         assert_eq!(grid.at(1, 1), '𐑮');
         assert_eq!(grid.at(2, 1), '𐑱');
         assert_eq!(grid.at(3, 1), '𐑑');
+    }
+
+    #[test]
+    fn ignore_spaces() {
+        let grid = Grid::new(
+            "  a     b     c\n\
+             d  e\tf",
+        ).unwrap();
+
+        assert_eq!(grid.width(), 3);
+        assert_eq!(grid.height(), 2);
+        assert_eq!(grid.at(0, 0), 'a');
+        assert_eq!(grid.at(1, 0), 'b');
+        assert_eq!(grid.at(2, 0), 'c');
+        assert_eq!(grid.at(0, 1), 'd');
+        assert_eq!(grid.at(1, 1), 'e');
+        assert_eq!(grid.at(2, 1), 'f');
     }
 }
