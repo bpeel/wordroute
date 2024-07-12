@@ -16,7 +16,7 @@
 
 use super::grid::Grid;
 use super::dictionary;
-use super::directions::DIRECTIONS;
+use super::directions::{self, N_DIRECTIONS};
 use super::counts::GridCounts;
 use super::word_finder;
 use std::collections::HashSet;
@@ -25,7 +25,7 @@ struct StackEntry<'a> {
     x: u32,
     y: u32,
     walker: dictionary::Walker<'a>,
-    next_direction: usize,
+    next_direction: u8,
 }
 
 fn search_from_pos(
@@ -60,7 +60,7 @@ fn search_from_pos(
             while let Some(entry) = stack.pop() {
                 visited[(entry.y * grid.width() + entry.x) as usize] = false;
 
-                if entry.next_direction < DIRECTIONS.len() {
+                if entry.next_direction < N_DIRECTIONS {
                     stack.push(entry);
                     break;
                 }
@@ -81,11 +81,15 @@ fn search_from_pos(
                 word_list.insert(word);
             }
 
-            let next_offset = DIRECTIONS[entry.next_direction];
+            let next_pos = directions::step(
+                entry.x,
+                entry.y,
+                entry.next_direction,
+            );
 
             let next_entry = StackEntry {
-                x: entry.x.wrapping_add_signed(next_offset.0),
-                y: entry.y.wrapping_add_signed(next_offset.1),
+                x: next_pos.0,
+                y: next_pos.1,
                 walker: next_walker,
                 next_direction: 0,
             };
@@ -141,9 +145,7 @@ pub fn count_visits<I, T>(
         let mut y = route.start_y;
 
         for &step in route.steps {
-            let offset = DIRECTIONS[step as usize];
-            x = x.checked_add_signed(offset.0).unwrap();
-            y = y.checked_add_signed(offset.1).unwrap();
+            (x, y) = directions::step(x, y, step);
             counts.at_mut(x, y).visits += 1;
         }
     }
@@ -191,8 +193,8 @@ mod test {
         assert_eq!(&search("start", 3), &["start"]);
         assert_eq!(
             &search(
-                "cabs\n\
-                 trat",
+                "c a b s\n\
+                  t r a t",
                 3,
             ),
             &["cab", "start"],
@@ -203,15 +205,15 @@ mod test {
     fn no_reuse() {
         assert!(
             &search(
-                ".st\n\
-                 xra",
+                ". s t\n\
+                  x r a",
                 3,
             ).is_empty(),
         );
         assert_eq!(
             &search(
-                ".st\n\
-                 tra",
+                ". s t\n\
+                  t r a",
                 3,
             ),
             &["start"],
@@ -222,9 +224,9 @@ mod test {
     fn cross() {
         assert_eq!(
             &search(
-                "..c..\n\
-                 start\n\
-                 xxb",
+                ". . c . .\n\
+                  s t a r t\n\
+                 x x b",
                 3,
             ),
             &["cab", "start"],
@@ -235,45 +237,48 @@ mod test {
     fn all_directions() {
         assert_eq!(&search("start", 3), &["start"]);
         assert_eq!(&search("trats", 3), &["start"]);
-        assert_eq!(&search("s\nt\na\nr\nt", 3), &["start"]);
-        assert_eq!(&search("t\nr\na\nt\ns", 3), &["start"]);
 
         assert_eq!(
             &search(
-                "cxx\n\
-                 xax\n\
-                 xxb",
+                "s x x\n\
+                  t x x\n\
+                 x a x\n\
+                  x r x\n\
+                 x x t",
                 3,
             ),
-            &["cab"],
-        );
+            &["start"]);
         assert_eq!(
             &search(
-                "xxc\n\
-                 xax\n\
-                 bxx",
+                "x x s\n\
+                  x t x\n\
+                 x a x\n\
+                  r x x\n\
+                 t x x",
                 3,
             ),
-            &["cab"],
-        );
+            &["start"]);
+
         assert_eq!(
             &search(
-                "xxb\n\
-                 xax\n\
-                 cxx",
+                "t x x\n\
+                  r x x\n\
+                 x a x\n\
+                  x t x\n\
+                 x x s",
                 3,
             ),
-            &["cab"],
-        );
+            &["start"]);
         assert_eq!(
             &search(
-                "bxx\n\
-                 xax\n\
-                 xxc",
+                "x x t\n\
+                  x r x\n\
+                 x a x\n\
+                  t x x\n\
+                 s x x",
                 3,
             ),
-            &["cab"],
-        );
+            &["start"]);
     }
 
     #[test]
@@ -285,9 +290,9 @@ mod test {
     #[test]
     fn visits() {
         let grid = Grid::new(
-            "stx\n\
-             rax\n\
-             ctb"
+            "s t x\n\
+              a r x\n\
+             c b t"
         ).unwrap();
 
         let words = search_words(&grid, &make_dictionary(), 3);
@@ -304,9 +309,9 @@ mod test {
         assert_eq!(counts.at(2, 0).starts, 0);
         assert_eq!(counts.at(2, 0).visits, 0);
         assert_eq!(counts.at(0, 1).starts, 0);
-        assert_eq!(counts.at(0, 1).visits, 1);
+        assert_eq!(counts.at(0, 1).visits, 2);
         assert_eq!(counts.at(1, 1).starts, 0);
-        assert_eq!(counts.at(1, 1).visits, 2);
+        assert_eq!(counts.at(1, 1).visits, 1);
         assert_eq!(counts.at(2, 1).starts, 0);
         assert_eq!(counts.at(2, 1).visits, 0);
         assert_eq!(counts.at(0, 2).starts, 1);

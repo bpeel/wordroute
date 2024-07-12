@@ -15,12 +15,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use super::grid::Grid;
-use super::directions::DIRECTIONS;
+use super::directions::{self, N_DIRECTIONS};
 
 struct StackEntry {
     x: u32,
     y: u32,
-    next_direction: usize,
+    next_direction: u8,
     word_start: usize,
 }
 
@@ -76,7 +76,7 @@ impl Finder {
                         (entry.y * grid.width() + entry.x) as usize
                     ] = false;
 
-                    if entry.next_direction < DIRECTIONS.len() {
+                    if entry.next_direction < N_DIRECTIONS {
                         self.stack.push(entry);
                         break;
                     }
@@ -99,11 +99,15 @@ impl Finder {
                     return true;
                 }
 
-                let next_offset = DIRECTIONS[entry.next_direction];
+                let next_pos = directions::step(
+                    entry.x,
+                    entry.y,
+                    entry.next_direction,
+                );
 
                 let next_entry = StackEntry {
-                    x: entry.x.wrapping_add_signed(next_offset.0),
-                    y: entry.y.wrapping_add_signed(next_offset.1),
+                    x: next_pos.0,
+                    y: next_pos.1,
                     word_start: next_word_start,
                     next_direction: 0,
                 };
@@ -144,50 +148,30 @@ mod test {
         let mut finder = Finder::new();
 
         let grid = Grid::new(
-            "abc\n\
-             def\n\
-             ghi"
+            "a b c\n\
+              d e f\n\
+             g h i"
         ).unwrap();
 
         let route = finder.find(&grid, "abc").unwrap();
         assert_eq!(route.start_x, 0);
         assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[4, 4]);
+        assert_eq!(route.steps, &[3, 3]);
 
         let route = finder.find(&grid, "cba").unwrap();
         assert_eq!(route.start_x, 2);
         assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[3, 3]);
+        assert_eq!(route.steps, &[2, 2]);
 
         let route = finder.find(&grid, "adg").unwrap();
         assert_eq!(route.start_x, 0);
         assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[6, 6]);
+        assert_eq!(route.steps, &[5, 4]);
 
         let route = finder.find(&grid, "gda").unwrap();
         assert_eq!(route.start_x, 0);
         assert_eq!(route.start_y, 2);
-        assert_eq!(route.steps, &[1, 1]);
-
-        let route = finder.find(&grid, "aei").unwrap();
-        assert_eq!(route.start_x, 0);
-        assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[7, 7]);
-
-        let route = finder.find(&grid, "iea").unwrap();
-        assert_eq!(route.start_x, 2);
-        assert_eq!(route.start_y, 2);
-        assert_eq!(route.steps, &[0, 0]);
-
-        let route = finder.find(&grid, "ceg").unwrap();
-        assert_eq!(route.start_x, 2);
-        assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[5, 5]);
-
-        let route = finder.find(&grid, "gec").unwrap();
-        assert_eq!(route.start_x, 0);
-        assert_eq!(route.start_y, 2);
-        assert_eq!(route.steps, &[2, 2]);
+        assert_eq!(route.steps, &[1, 0]);
     }
 
     #[test]
@@ -195,19 +179,19 @@ mod test {
         let mut finder = Finder::new();
 
         let grid = Grid::new(
-            "backtrap\n\
-             xxxxxxkc"
+            "b a c k t r a p\n\
+              x x x x x x c k"
         ).unwrap();
 
         let route = finder.find(&grid, "backtrap").unwrap();
         assert_eq!(route.start_x, 0);
         assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[4, 4, 4, 4, 4, 4, 4]);
+        assert_eq!(route.steps, &[3, 3, 3, 3, 3, 3, 3]);
 
         let route = finder.find(&grid, "backtrack").unwrap();
         assert_eq!(route.start_x, 0);
         assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[4, 4, 4, 4, 4, 4, 7, 3]);
+        assert_eq!(route.steps, &[3, 3, 3, 3, 3, 3, 5, 3]);
     }
 
     #[test]
@@ -221,8 +205,8 @@ mod test {
     fn no_reuse() {
         let mut finder = Finder::new();
         let grid = Grid::new(
-            "reu\n\
-             xes"
+            "r e u\n\
+              e s x"
         ).unwrap();
 
         // Make sure that the bottom ‘e’ was used for the last letter
@@ -231,7 +215,7 @@ mod test {
         let route = finder.find(&grid, "reuse").unwrap();
         assert_eq!(route.start_x, 0);
         assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[4, 4, 6, 3]);
+        assert_eq!(route.steps, &[3, 3, 4, 2]);
 
         assert!(finder.find(&grid, "reuser").is_none());
     }

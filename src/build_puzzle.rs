@@ -42,11 +42,19 @@ struct Cli {
 
 fn print_grid(grid: &grid::Grid, counts: &counts::GridCounts) {
     for y in 0..grid.height() {
+        if y & 1 != 0 {
+            print!("   ");
+        }
+
         for x in 0..grid.width() {
             print!("  {}   ", grid.at(x, y));
         }
 
         println!();
+
+        if y & 1 != 0 {
+            print!("   ");
+        }
 
         for x in 0..grid.width() {
             let counts = counts.at(x, y);
