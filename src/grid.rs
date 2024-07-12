@@ -39,7 +39,7 @@ impl fmt::Display for Error {
 impl Grid {
     pub fn new(s: &str) -> Result<Grid, Error> {
         // Find the longest line
-        let width = s.lines().map(|line| line.trim_end().len())
+        let width = s.lines().map(|line| line.trim_end().chars().count())
             .max()
             .unwrap_or(0);
 
@@ -126,5 +126,24 @@ mod test {
         assert_eq!(grid.at(1, 1), ' ');
         assert_eq!(grid.at(0, 2), 'd');
         assert_eq!(grid.at(1, 2), ' ');
+    }
+
+    #[test]
+    fn multibyte() {
+        let grid = Grid::new(
+            "𐑖𐑷𐑦𐑟\n\
+             𐑜𐑮𐑱𐑑",
+        ).unwrap();
+
+        assert_eq!(grid.width(), 4);
+        assert_eq!(grid.height(), 2);
+        assert_eq!(grid.at(0, 0), '𐑖');
+        assert_eq!(grid.at(1, 0), '𐑷');
+        assert_eq!(grid.at(2, 0), '𐑦');
+        assert_eq!(grid.at(3, 0), '𐑟');
+        assert_eq!(grid.at(0, 1), '𐑜');
+        assert_eq!(grid.at(1, 1), '𐑮');
+        assert_eq!(grid.at(2, 1), '𐑱');
+        assert_eq!(grid.at(3, 1), '𐑑');
     }
 }
