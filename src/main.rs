@@ -33,6 +33,23 @@ struct Cli {
     minimum_length: usize,
 }
 
+fn print_grid(grid: &grid::Grid, counts: &counts::GridCounts) {
+    for y in 0..grid.height() {
+        for x in 0..grid.width() {
+            print!("  {}   ", grid.at(x, y));
+        }
+
+        println!();
+
+        for x in 0..grid.width() {
+            let counts = counts.at(x, y);
+            print!("{:>2} {:<3}", counts.starts, counts.visits);
+        }
+
+        println!();
+    }
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
 
@@ -63,6 +80,11 @@ fn main() -> ExitCode {
     };
 
     let words = build::search_words(&grid, &dictionary, cli.minimum_length);
+    let counts = build::count_visits(&grid, words.iter());
+
+    print_grid(&grid, &counts);
+
+    println!();
 
     let mut words = words.into_iter().collect::<Vec<_>>();
     words.sort();
