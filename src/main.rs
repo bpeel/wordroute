@@ -19,6 +19,7 @@ mod build;
 mod dictionary;
 mod directions;
 mod word_finder;
+mod counts;
 
 use std::{fs, process::ExitCode, ffi::OsString};
 use clap::Parser;

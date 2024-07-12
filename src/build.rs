@@ -17,6 +17,8 @@
 use super::grid::Grid;
 use super::dictionary;
 use super::directions::DIRECTIONS;
+use super::counts::GridCounts;
+use super::word_finder;
 use std::collections::HashSet;
 
 struct StackEntry<'a> {
@@ -117,6 +119,37 @@ pub fn search_words(
     }
 
     word_list
+}
+
+pub fn count_visits<I, T>(
+    grid: &Grid,
+    words: I,
+) -> GridCounts
+    where I: IntoIterator<Item = T>,
+          T: AsRef<str>
+{
+    let mut counts = GridCounts::new(grid.width(), grid.height());
+    let mut finder = word_finder::Finder::new();
+
+    for word in words {
+        let route = finder.find(grid, word.as_ref()).unwrap();
+
+        let start = counts.at_mut(route.start_x, route.start_y);
+        start.starts += 1;
+        start.visits += 1;
+
+        let mut x = route.start_x;
+        let mut y = route.start_y;
+
+        for &step in route.steps {
+            let offset = DIRECTIONS[step as usize];
+            x = x.checked_add_signed(offset.0).unwrap();
+            y = y.checked_add_signed(offset.1).unwrap();
+            counts.at_mut(x, y).visits += 1;
+        }
+    }
+
+    counts
 }
 
 #[cfg(test)]
@@ -248,5 +281,40 @@ mod test {
     fn minimum_length() {
         assert!(&search("cab", 4).is_empty());
         assert_eq!(&search("cab", 3), &["cab"]);
+    }
+
+    #[test]
+    fn visits() {
+        let grid = Grid::new(
+            "stx\n\
+             rax\n\
+             ctb"
+        ).unwrap();
+
+        let words = search_words(&grid, &make_dictionary(), 3);
+
+        assert!(words.contains("start"));
+        assert!(words.contains("cab"));
+
+        let counts = count_visits(&grid, words.iter());
+
+        assert_eq!(counts.at(0, 0).starts, 1);
+        assert_eq!(counts.at(0, 0).visits, 1);
+        assert_eq!(counts.at(1, 0).starts, 0);
+        assert_eq!(counts.at(1, 0).visits, 1);
+        assert_eq!(counts.at(2, 0).starts, 0);
+        assert_eq!(counts.at(2, 0).visits, 0);
+        assert_eq!(counts.at(0, 1).starts, 0);
+        assert_eq!(counts.at(0, 1).visits, 1);
+        assert_eq!(counts.at(1, 1).starts, 0);
+        assert_eq!(counts.at(1, 1).visits, 2);
+        assert_eq!(counts.at(2, 1).starts, 0);
+        assert_eq!(counts.at(2, 1).visits, 0);
+        assert_eq!(counts.at(0, 2).starts, 1);
+        assert_eq!(counts.at(0, 2).visits, 1);
+        assert_eq!(counts.at(1, 2).starts, 0);
+        assert_eq!(counts.at(1, 2).visits, 1);
+        assert_eq!(counts.at(2, 2).starts, 0);
+        assert_eq!(counts.at(2, 2).visits, 1);
     }
 }
