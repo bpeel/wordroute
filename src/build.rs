@@ -73,7 +73,10 @@ fn search_from_pos(
 
             let word_length = stack.len() + 1;
 
-            if word_length >= minimum_length && next_walker.is_end() {
+            if entry.next_direction == 0 &&
+                word_length >= minimum_length &&
+                next_walker.is_end()
+            {
                 let mut word = stack.iter().map(|entry| {
                     grid.at(entry.x, entry.y)
                 }).collect::<String>();
