@@ -51,10 +51,11 @@ fn search_from_pos(
     let mut visited = vec![false; (grid.width() * grid.height()) as usize];
 
     while let Some(mut entry) = stack.pop() {
-        if entry.x >= grid.width() ||
-            entry.y >= grid.height() ||
-            visited[(entry.y * grid.width() + entry.x) as usize] ||
-            entry.walker.step(grid.at(entry.x, entry.y)).is_none()
+        if entry.next_direction == 0 &&
+            (entry.x >= grid.width() ||
+             entry.y >= grid.height() ||
+             visited[(entry.y * grid.width() + entry.x) as usize] ||
+             entry.walker.step(grid.at(entry.x, entry.y)).is_none())
         {
             // Backtrack
             while let Some(entry) = stack.pop() {
