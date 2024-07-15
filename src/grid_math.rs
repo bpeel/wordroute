@@ -15,11 +15,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use super::grid::Grid;
+use std::f32::consts::PI;
 
 // Return the width of the grid as the number of half hexagons. The
 // odd rows can take up an extra half hexagon, but sometimes this
 // isn’t needed if the end as a blank.
-pub fn half_grid_width(grid: &Grid) -> u32 {
+fn half_grid_width(grid: &Grid) -> u32 {
     (0..grid.height()).map(|y| {
         let last = (0..grid.width()).rev().find(|&x| grid.at(x, y) != '.')
             .unwrap_or(0);
@@ -31,6 +32,49 @@ pub fn half_grid_width(grid: &Grid) -> u32 {
             width + 1
         }
     }).max().unwrap_or(0)
+}
+
+pub struct Geometry {
+    // Coordinates of the center of the top left hexagon
+    pub top_x: f32,
+    pub top_y: f32,
+    // The outer radius of a hexagon
+    pub radius: f32,
+    // Horizontal distance between the centres of hexagons
+    pub step_x: f32,
+    // Vertical dintance between the centres of hexagons
+    pub step_y: f32,
+}
+
+impl Geometry {
+    pub fn new(grid: &Grid, viewport_size: f32) -> Geometry {
+        // Number of apothems required for the width
+        let width_in_apothems = half_grid_width(grid) as f32;
+        // The radius of a hexagon in units of apothems
+        let radius_in_apothems = 1.0 / (PI / 6.0).cos();
+        // Number of apothems required for the height
+        let height_in_apothems =
+            (grid.height() - 1) as f32 * 1.5 * radius_in_apothems +
+            radius_in_apothems * 2.0;
+
+        let apothem = viewport_size / width_in_apothems.max(height_in_apothems);
+        let radius = radius_in_apothems * apothem;
+
+        let top_x = viewport_size / 2.0 -
+            width_in_apothems * apothem / 2.0 +
+            apothem;
+        let top_y = viewport_size / 2.0 -
+            height_in_apothems * apothem / 2.0 +
+            radius;
+
+        Geometry {
+            top_x,
+            top_y,
+            radius,
+            step_x: apothem * 2.0,
+            step_y: radius * 1.5,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -67,5 +111,17 @@ mod test {
             ).unwrap()),
             7,
         );
+    }
+
+    #[test]
+    fn geometry() {
+        let grid = Grid::new("aaaa\naaa.").unwrap();
+        let geometry = Geometry::new(&grid, 16.0);
+
+        assert!((geometry.top_x - 2.0).abs() < 0.01);
+        assert!((geometry.step_x - 4.0).abs() < 0.01);
+        assert!((geometry.radius - (4.0 / 3.0f32.sqrt())).abs() < 0.01);
+        assert!((geometry.step_y - (geometry.radius * 1.5)).abs() < 0.01);
+        assert!((geometry.top_y - (8.0 - geometry.step_y / 2.0)) < 0.01);
     }
 }

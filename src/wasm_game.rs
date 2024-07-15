@@ -17,7 +17,7 @@
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 use super::grid::Grid;
-use super::grid_math::half_grid_width;
+use super::grid_math::Geometry;
 use std::fmt::Write;
 use js_sys::Reflect;
 use std::f32::consts::PI;
@@ -281,26 +281,12 @@ impl Wordroute {
     }
 
     fn create_letters(&mut self) -> Result<(), String> {
-        // Number of apothems required for the width. The extra one is
-        // because the odd rows are offset by an apothem.
-        let width_in_apothems = half_grid_width(&self.grid) as f32;
-        // The radius of a hexagon in units of apothems
-        let radius_in_apothems = 1.0 / (PI / 6.0).cos();
-        // Number of apothems required for the height.
-        let height_in_apothems =
-            (self.grid.height() - 1) as f32 * 1.5 * radius_in_apothems +
-            radius_in_apothems * 2.0;
+        let geometry = Geometry::new(&self.grid, 100.0);
 
-        let apothem = 100.0 / width_in_apothems.max(height_in_apothems);
-        let radius = radius_in_apothems * apothem;
+        let hexagon_path = hexagon_path(geometry.radius);
 
-        let top_x = 50.0 - width_in_apothems * apothem / 2.0 + apothem;
-        let top_y = 50.0 - height_in_apothems * apothem / 2.0 + radius;
-
-        let hexagon_path = hexagon_path(radius);
-
-        let font_size = format!("{}", radius * 1.2);
-        let text_y_pos = format!("{}", apothem * 0.4);
+        let font_size = format!("{}", geometry.radius * 1.2);
+        let text_y_pos = format!("{}", geometry.radius * 0.3);
 
         for (x, y) in (0..self.grid.height())
             .map(|y| (0..self.grid.width()).map(move |x| (x, y)))
@@ -317,7 +303,7 @@ impl Wordroute {
             let x_off = if y & 1 == 0 {
                 0.0
             } else {
-                apothem
+                geometry.step_x / 2.0
             };
 
             let _ = g.set_attribute("class", "letter");
@@ -325,8 +311,8 @@ impl Wordroute {
                 "transform",
                 &format!(
                     "translate({}, {})",
-                    top_x + x as f32 * apothem * 2.0 + x_off,
-                    top_y + y as f32 * radius * 1.5,
+                    geometry.top_x + x as f32 * geometry.step_x + x_off,
+                    geometry.top_y + y as f32 * geometry.step_y,
                 ),
             );
             g.set_id(&format!("letter-{}-{}", x, y));
