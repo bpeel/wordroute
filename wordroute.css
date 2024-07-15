@@ -37,6 +37,19 @@ h1, h2 {
     stroke-width: 0.02em;
 }
 
+#route-line circle {
+    fill: red;
+    opacity: 0.7;
+}
+
+#route-line path {
+    fill: none;
+    stroke: red;
+    opacity: 0.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 @media only all and (max-width: 45em) {
     #content, #instructions {
         position: absolute;

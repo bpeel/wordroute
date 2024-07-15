@@ -18,11 +18,14 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 use super::grid::Grid;
 use super::grid_math::Geometry;
+use super::word_finder;
+use super::directions;
 use std::fmt::Write;
 use js_sys::Reflect;
 use std::f32::consts::PI;
 
 const SVG_NAMESPACE: &'static str = "http://www.w3.org/2000/svg";
+const ROUTE_ID: &'static str = "route-line";
 
 fn show_error(message: &str) {
     console::log_1(&message.into());
@@ -224,11 +227,15 @@ impl Loader {
 
 struct Wordroute {
     context: Context,
+    keydown_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
     game_grid: web_sys::SvgElement,
     letters: Vec<web_sys::SvgElement>,
     grid: Grid,
     geometry: Geometry,
+    word_finder: word_finder::Finder,
+    route_start: Option<(u32, u32)>,
+    route_steps: Vec<u8>,
 }
 
 impl Wordroute {
@@ -258,19 +265,43 @@ impl Wordroute {
 
         let mut wordroute = Box::new(Wordroute {
             context,
+            keydown_closure: None,
             game_contents,
             game_grid,
             grid,
             geometry,
             letters: Vec::new(),
+            word_finder: word_finder::Finder::new(),
+            route_start: None,
+            route_steps: Vec::new(),
         });
 
+        wordroute.create_closures();
         wordroute.update_title();
         wordroute.create_letters()?;
 
         wordroute.show_game_contents();
 
         Ok(wordroute)
+    }
+
+    fn create_closures(&mut self) {
+        let wordroute_pointer = self as *mut Wordroute;
+
+        let keydown_closure = Closure::<dyn Fn(JsValue)>::new(
+            move |event: JsValue| {
+                let wordroute = unsafe { &mut *wordroute_pointer };
+                let event: web_sys::KeyboardEvent = event.dyn_into().unwrap();
+                wordroute.handle_keydown_event(event);
+            }
+        );
+
+        let _ = self.context.document.add_event_listener_with_callback(
+            "keydown",
+            keydown_closure.as_ref().unchecked_ref(),
+        );
+
+        self.keydown_closure = Some(keydown_closure);
     }
 
     fn create_svg_element(
@@ -357,6 +388,133 @@ impl Wordroute {
         {
             let value = format!("WordRoute #{}", 1);
             self.set_element_text(&element, &value);
+        }
+    }
+
+    fn update_word_route(&self) -> Result<(), String> {
+        if let Some(old_route) = self.context.document.get_element_by_id(
+            ROUTE_ID,
+        ) {
+            old_route.remove();
+        }
+
+        if let Some((start_x, start_y)) = self.route_start {
+            let g = self.create_svg_element("g")?;
+            g.set_id(ROUTE_ID);
+
+            let (cx, cy) = self.geometry.convert_coords(start_x, start_y);
+
+            let circle = self.create_svg_element("circle")?;
+            let _ = circle.set_attribute(
+                "r",
+                &(self.geometry.radius * 0.4).to_string());
+            let _ = circle.set_attribute("cx", &cx.to_string());
+            let _ = circle.set_attribute("cy", &cy.to_string());
+
+            let _ = g.append_with_node_1(&circle);
+
+            if !self.route_steps.is_empty() {
+                let (mut x, mut y) = (start_x, start_y);
+                let mut path_d = format!("M {},{}", cx, cy);
+
+                for &dir in self.route_steps.iter() {
+                    (x, y) = directions::step(x, y, dir);
+                    let (x, y) = self.geometry.convert_coords(x, y);
+                    write!(&mut path_d, "L {},{}", x, y).unwrap();
+                }
+
+                let path = self.create_svg_element("path")?;
+                let _ = path.set_attribute("d", &path_d);
+                let _ = path.set_attribute(
+                    "stroke-width",
+                    &(self.geometry.radius * 0.3).to_string(),
+                );
+
+                let _ = g.append_with_node_1(&path);
+            }
+
+            let _ = self.game_grid.append_with_node_1(&g);
+        }
+
+        Ok(())
+    }
+
+    fn route_word(&self) -> String {
+        let mut word = String::new();
+
+        if let Some((mut x, mut y)) = self.route_start {
+            word.push(self.grid.at(x, y));
+
+            for &dir in self.route_steps.iter() {
+                (x, y) = directions::step(x, y, dir);
+                word.push(self.grid.at(x, y));
+            }
+        }
+
+        word
+    }
+
+    fn try_set_route_word(&mut self, word: &str) -> bool {
+        // Hack to work around the borrow checker
+        let mut route_steps = std::mem::take(&mut self.route_steps);
+
+        let result;
+
+        if let Some(word_finder::Route { start_x, start_y, steps }) =
+            self.word_finder.find(&self.grid, &word)
+        {
+            route_steps.clear();
+            route_steps.extend(steps.into_iter());
+            self.route_start = Some((start_x, start_y));
+
+            result = true;
+        } else {
+            result = false;
+        }
+
+        self.route_steps = route_steps;
+
+        result
+    }
+
+    fn handle_backspace(&mut self) {
+        if self.route_start.is_some() {
+            if self.route_steps.pop().is_none() {
+                self.route_start = None;
+            } else {
+                // Removing a character can change the route
+                // completely so let’s search for the word again
+                let word = self.route_word();
+                self.try_set_route_word(&word);
+            }
+
+            let _ = self.update_word_route();
+        }
+    }
+
+    fn handle_letter(&mut self, letter: char) {
+        let mut word = self.route_word();
+
+        word.push(letter);
+
+        if self.try_set_route_word(&word) {
+            let _ = self.update_word_route();
+        }
+    }
+
+    fn handle_keydown_event(&mut self, event: web_sys::KeyboardEvent) {
+        let key = event.key();
+
+        if key == "Backspace" {
+            self.handle_backspace();
+        } else {
+            let mut chars = key.chars();
+
+            if let Some(ch) = chars.next() {
+                if chars.next().is_none() {
+                    self.handle_letter(ch);
+                }
+            }
         }
     }
 }
