@@ -17,6 +17,7 @@
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 use super::grid::Grid;
+use super::grid_math::half_grid_width;
 use std::fmt::Write;
 use js_sys::Reflect;
 use std::f32::consts::PI;
@@ -282,7 +283,7 @@ impl Wordroute {
     fn create_letters(&mut self) -> Result<(), String> {
         // Number of apothems required for the width. The extra one is
         // because the odd rows are offset by an apothem.
-        let width_in_apothems = self.grid.width() as f32 * 2.0 + 1.0;
+        let width_in_apothems = half_grid_width(&self.grid) as f32;
         // The radius of a hexagon in units of apothems
         let radius_in_apothems = 1.0 / (PI / 6.0).cos();
         // Number of apothems required for the height.

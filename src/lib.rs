@@ -18,3 +18,5 @@
 mod wasm_game;
 #[cfg(any(target_arch = "wasm32", test))]
 mod grid;
+#[cfg(any(target_arch = "wasm32", test))]
+mod grid_math;
