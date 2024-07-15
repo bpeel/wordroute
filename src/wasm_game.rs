@@ -302,23 +302,12 @@ impl Wordroute {
 
             let g = self.create_svg_element("g")?;
 
-            let x_off = if y & 1 == 0 {
-                0.0
-            } else {
-                self.geometry.step_x / 2.0
-            };
+            let (x_center, y_center) = self.geometry.convert_coords(x, y);
 
             let _ = g.set_attribute("class", "letter");
             let _ = g.set_attribute(
                 "transform",
-                &format!(
-                    "translate({}, {})",
-                    self.geometry.top_x +
-                        x as f32 * self.geometry.step_x +
-                        x_off,
-                    self.geometry.top_y +
-                        y as f32 * self.geometry.step_y,
-                ),
+                &format!("translate({}, {})", x_center, y_center),
             );
             g.set_id(&format!("letter-{}-{}", x, y));
 

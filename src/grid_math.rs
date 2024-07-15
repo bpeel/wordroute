@@ -75,6 +75,20 @@ impl Geometry {
             step_y: radius * 1.5,
         }
     }
+
+    // Calculate the centre of a hexagon in the grid
+    pub fn convert_coords(&self, x: u32, y: u32) -> (f32, f32) {
+        let x_off = if y & 1 == 0 {
+            0.0
+        } else {
+            self.step_x / 2.0
+        };
+
+        (
+            self.top_x + x as f32 * self.step_x + x_off,
+            self.top_y + y as f32 * self.step_y,
+        )
+    }
 }
 
 #[cfg(test)]
@@ -123,5 +137,21 @@ mod test {
         assert!((geometry.radius - (4.0 / 3.0f32.sqrt())).abs() < 0.01);
         assert!((geometry.step_y - (geometry.radius * 1.5)).abs() < 0.01);
         assert!((geometry.top_y - (8.0 - geometry.step_y / 2.0)) < 0.01);
+    }
+
+    #[test]
+    fn convert_coords() {
+        let grid = Grid::new("aaaa\naaa.").unwrap();
+        let geometry = Geometry::new(&grid, 16.0);
+
+        let (center_x, center_y) = geometry.convert_coords(0, 0);
+
+        assert!((center_x - 2.0).abs() < 0.01);
+        assert!((geometry.top_y - center_y).abs() < 0.01);
+
+        let (center_x, center_y) = geometry.convert_coords(1, 1);
+
+        assert!((center_x - 8.0).abs() < 0.01);
+        assert!((geometry.top_y + geometry.step_y - center_y).abs() < 0.01);
     }
 }
