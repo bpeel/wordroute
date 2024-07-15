@@ -1,0 +1,42 @@
+<!doctype html>
+
+<!--
+// Wordroute – A word game
+// Copyright (C) 2023, 2024  Neil Roberts
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+          content="A word search game with the Shavian alphabet.">
+    <title>Wordroute</title>
+    <link rel="stylesheet" type="text/css" href="wordroute.css">
+    <script type="module" src="wordroute.js"></script>
+  </head>
+  <body>
+    <div id="content">
+      <div class="title-bar">
+        <h1 id="title">Shawffle</h1>
+      </div>
+      <p id="message" style="display: block">Loading…</p>
+      <div id="game-contents" style="display: none">
+        <svg id="game-grid" viewBox="0 0 100 100"></svg>
+      </div>
+    </div>
+  </body>
+</html>
