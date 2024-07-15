@@ -228,6 +228,7 @@ struct Wordroute {
     game_grid: web_sys::SvgElement,
     letters: Vec<web_sys::SvgElement>,
     grid: Grid,
+    geometry: Geometry,
 }
 
 impl Wordroute {
@@ -253,11 +254,14 @@ impl Wordroute {
             return Err("no puzzles available".to_string());
         };
 
+        let geometry = Geometry::new(&grid, 100.0);
+
         let mut wordroute = Box::new(Wordroute {
             context,
             game_contents,
             game_grid,
             grid,
+            geometry,
             letters: Vec::new(),
         });
 
@@ -281,12 +285,10 @@ impl Wordroute {
     }
 
     fn create_letters(&mut self) -> Result<(), String> {
-        let geometry = Geometry::new(&self.grid, 100.0);
+        let hexagon_path = hexagon_path(self.geometry.radius);
 
-        let hexagon_path = hexagon_path(geometry.radius);
-
-        let font_size = format!("{}", geometry.radius * 1.2);
-        let text_y_pos = format!("{}", geometry.radius * 0.3);
+        let font_size = format!("{}", self.geometry.radius * 1.2);
+        let text_y_pos = format!("{}", self.geometry.radius * 0.3);
 
         for (x, y) in (0..self.grid.height())
             .map(|y| (0..self.grid.width()).map(move |x| (x, y)))
@@ -303,7 +305,7 @@ impl Wordroute {
             let x_off = if y & 1 == 0 {
                 0.0
             } else {
-                geometry.step_x / 2.0
+                self.geometry.step_x / 2.0
             };
 
             let _ = g.set_attribute("class", "letter");
@@ -311,8 +313,11 @@ impl Wordroute {
                 "transform",
                 &format!(
                     "translate({}, {})",
-                    geometry.top_x + x as f32 * geometry.step_x + x_off,
-                    geometry.top_y + y as f32 * geometry.step_y,
+                    self.geometry.top_x +
+                        x as f32 * self.geometry.step_x +
+                        x_off,
+                    self.geometry.top_y +
+                        y as f32 * self.geometry.step_y,
                 ),
             );
             g.set_id(&format!("letter-{}-{}", x, y));
