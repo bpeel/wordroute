@@ -3,6 +3,9 @@ name = "wordroute"
 version = "0.1.0"
 edition = "2021"
 default-run = "build-puzzle"
+license = "GPL-3.0-or-later"
+description = "A word search game"
+repository = "https://github.com/bpeel/wordroute"
 
 [lib]
 crate-type = ["cdylib"]
