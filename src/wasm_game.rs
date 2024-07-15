@@ -477,6 +477,13 @@ impl Wordroute {
         result
     }
 
+    fn handle_escape(&mut self) {
+        if self.route_start.is_some() {
+            self.route_start = None;
+            let _ = self.update_word_route();
+        }
+    }
+
     fn handle_backspace(&mut self) {
         if self.route_start.is_some() {
             if self.route_steps.pop().is_none() {
@@ -507,6 +514,8 @@ impl Wordroute {
 
         if key == "Backspace" {
             self.handle_backspace();
+        } else if key == "Escape" {
+            self.handle_escape();
         } else {
             let mut chars = key.chars();
 
