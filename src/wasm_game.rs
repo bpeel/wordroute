@@ -238,7 +238,7 @@ struct Wordroute {
     current_word: web_sys::HtmlElement,
     word_message: web_sys::HtmlElement,
     game_grid: web_sys::SvgElement,
-    letters: Vec<Letter>,
+    letters: Vec<Option<Letter>>,
     grid: Grid,
     counts: GridCounts,
     words: HashMap<String, Word>,
@@ -377,6 +377,7 @@ impl Wordroute {
             let letter = self.grid.at(x, y);
 
             if letter == '.' {
+                self.letters.push(None);
                 continue;
             }
 
@@ -424,11 +425,11 @@ impl Wordroute {
 
             let _ = self.game_grid.append_with_node_1(&g);
 
-            self.letters.push(Letter {
+            self.letters.push(Some(Letter {
                 group: g,
                 starts,
                 visits,
-            });
+            }));
         }
 
         let _ = self.game_grid.set_attribute(
