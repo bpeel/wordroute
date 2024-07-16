@@ -591,23 +591,7 @@ fn get_count_value(array: &js_sys::Array, key: u32) -> Result<u8, ()> {
     }).map(|v| v as u8)
 }
 
-fn parse_puzzle(data: JsValue) -> Result<Puzzle, ()> {
-    let Ok(grid_str) = Reflect::get(&data, &"grid".into())
-        .map_err(|_| ())
-        .and_then(|v| TryInto::<String>::try_into(v).map_err(|_| ()))
-    else {
-        show_error("Error getting puzzle grid");
-        return Err(())
-    };
-
-    let grid = match Grid::new(&grid_str) {
-        Ok(g) => g,
-        Err(e) => {
-            show_error(&e.to_string());
-            return Err(());
-        },
-    };
-
+fn parse_counts(data: &JsValue, grid: &Grid) -> Result<GridCounts, ()> {
     let Ok(counts_array) = Reflect::get(&data, &"counts".into())
         .map_err(|_| ())
         .and_then(|v| TryInto::<js_sys::Array>::try_into(v).map_err(|_| ()))
@@ -632,6 +616,28 @@ fn parse_puzzle(data: JsValue) -> Result<Puzzle, ()> {
             *counts.at_mut(x, y) = TileCounts { starts, visits };
         }
     }
+
+    Ok(counts)
+}
+
+fn parse_puzzle(data: JsValue) -> Result<Puzzle, ()> {
+    let Ok(grid_str) = Reflect::get(&data, &"grid".into())
+        .map_err(|_| ())
+        .and_then(|v| TryInto::<String>::try_into(v).map_err(|_| ()))
+    else {
+        show_error("Error getting puzzle grid");
+        return Err(())
+    };
+
+    let grid = match Grid::new(&grid_str) {
+        Ok(g) => g,
+        Err(e) => {
+            show_error(&e.to_string());
+            return Err(());
+        },
+    };
+
+    let counts = parse_counts(&data, &grid)?;
 
     Ok(Puzzle {
         grid,
