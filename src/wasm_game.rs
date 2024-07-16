@@ -183,62 +183,8 @@ impl Loader {
         self.data_error_closure = Some(error_closure);
     }
 
-    fn parse_puzzle(&mut self, data: JsValue) -> Result<Puzzle, ()> {
-        let Ok(grid_str) = Reflect::get(&data, &"grid".into())
-            .map_err(|_| ())
-            .and_then(|v| TryInto::<String>::try_into(v).map_err(|_| ()))
-        else {
-            show_error("Error getting puzzle grid");
-            return Err(())
-        };
-
-        let grid = match Grid::new(&grid_str) {
-            Ok(g) => g,
-            Err(e) => {
-                show_error(&e.to_string());
-                return Err(());
-            },
-        };
-
-        let Ok(counts_array) = Reflect::get(&data, &"counts".into())
-            .map_err(|_| ())
-            .and_then(|v| TryInto::<js_sys::Array>::try_into(v).map_err(|_| ()))
-        else {
-            show_error("Error getting puzzle counts");
-            return Err(());
-        };
-
-        let mut counts = GridCounts::new(grid.width(), grid.height());
-
-        for y in 0..grid.height() {
-            for x in 0..grid.width() {
-                let starts = get_count_value(
-                    &counts_array,
-                    (y * grid.width() + x) * 2,
-                )?;
-                let visits = get_count_value(
-                    &counts_array,
-                    (y * grid.width() + x) * 2 + 1,
-                )?;
-
-                *counts.at_mut(x, y) = TileCounts { starts, visits };
-            }
-        }
-
-        Ok(Puzzle {
-            grid,
-            counts,
-        })
-    }
-
-    fn parse_puzzles(&mut self, data: JsValue) -> Result<Vec<Puzzle>, ()> {
-        let puzzle = self.parse_puzzle(data)?;
-
-        Ok(vec![puzzle])
-    }
-
     fn data_loaded(&mut self, data: JsValue) {
-        match self.parse_puzzles(data) {
+        match parse_puzzles(data) {
             Err(_) => {
                 self.stop_floating();
             },
@@ -643,6 +589,60 @@ fn get_count_value(array: &js_sys::Array, key: u32) -> Result<u8, ()> {
         show_error("Error getting count value");
         ()
     }).map(|v| v as u8)
+}
+
+fn parse_puzzle(data: JsValue) -> Result<Puzzle, ()> {
+    let Ok(grid_str) = Reflect::get(&data, &"grid".into())
+        .map_err(|_| ())
+        .and_then(|v| TryInto::<String>::try_into(v).map_err(|_| ()))
+    else {
+        show_error("Error getting puzzle grid");
+        return Err(())
+    };
+
+    let grid = match Grid::new(&grid_str) {
+        Ok(g) => g,
+        Err(e) => {
+            show_error(&e.to_string());
+            return Err(());
+        },
+    };
+
+    let Ok(counts_array) = Reflect::get(&data, &"counts".into())
+        .map_err(|_| ())
+        .and_then(|v| TryInto::<js_sys::Array>::try_into(v).map_err(|_| ()))
+    else {
+        show_error("Error getting puzzle counts");
+        return Err(());
+    };
+
+    let mut counts = GridCounts::new(grid.width(), grid.height());
+
+    for y in 0..grid.height() {
+        for x in 0..grid.width() {
+            let starts = get_count_value(
+                &counts_array,
+                (y * grid.width() + x) * 2,
+            )?;
+            let visits = get_count_value(
+                &counts_array,
+                (y * grid.width() + x) * 2 + 1,
+            )?;
+
+            *counts.at_mut(x, y) = TileCounts { starts, visits };
+        }
+    }
+
+    Ok(Puzzle {
+        grid,
+        counts,
+    })
+}
+
+fn parse_puzzles(data: JsValue) -> Result<Vec<Puzzle>, ()> {
+    let puzzle = parse_puzzle(data)?;
+
+    Ok(vec![puzzle])
 }
 
 #[wasm_bindgen]
