@@ -24,6 +24,7 @@ use super::directions;
 use std::fmt::Write;
 use js_sys::Reflect;
 use std::f32::consts::PI;
+use std::collections::HashMap;
 
 const SVG_NAMESPACE: &'static str = "http://www.w3.org/2000/svg";
 const ROUTE_ID: &'static str = "route-line";
@@ -212,9 +213,21 @@ struct Letter {
     visits: web_sys::SvgElement,
 }
 
+enum WordType {
+    Normal,
+    Bonus,
+}
+
+struct Word {
+    word_type: WordType,
+    length: usize,
+    found: bool,
+}
+
 struct Puzzle {
     grid: Grid,
     counts: GridCounts,
+    words: HashMap<String, Word>,
 }
 
 struct Wordroute {
@@ -225,6 +238,7 @@ struct Wordroute {
     letters: Vec<Letter>,
     grid: Grid,
     counts: GridCounts,
+    words: HashMap<String, Word>,
     geometry: Geometry,
     word_finder: word_finder::Finder,
     route_start: Option<(u32, u32)>,
@@ -249,7 +263,7 @@ impl Wordroute {
             return Err("failed to get game grid".to_string());
         };
 
-        let Some(Puzzle { grid, counts }) = puzzles.into_iter().next()
+        let Some(Puzzle { grid, counts, words }) = puzzles.into_iter().next()
         else {
             return Err("no puzzles available".to_string());
         };
@@ -263,6 +277,7 @@ impl Wordroute {
             game_grid,
             grid,
             counts,
+            words,
             geometry,
             letters: Vec::new(),
             word_finder: word_finder::Finder::new(),
@@ -620,6 +635,60 @@ fn parse_counts(data: &JsValue, grid: &Grid) -> Result<GridCounts, ()> {
     Ok(counts)
 }
 
+fn parse_words(data: &JsValue) -> Result<HashMap<String, Word>, ()> {
+    let Ok(words_object) = Reflect::get(&data, &"words".into())
+        .map_err(|_| ())
+        .and_then(|v| TryInto::<js_sys::Object>::try_into(v).map_err(|_| ()))
+    else {
+        show_error("Error getting word list");
+        return Err(());
+    };
+
+    let words_array = js_sys::Object::keys(&words_object);
+
+    let mut words = HashMap::new();
+
+    for i in 0..words_array.length() {
+        let word_value = words_array.get(i);
+
+        let Some(type_num) = Reflect::get(&words_object, &word_value)
+            .ok()
+            .and_then(|v| v.as_f64())
+        else {
+            show_error("Word type is not a float");
+            return Err(());
+        };
+
+        let Ok(word) = TryInto::<String>::try_into(word_value)
+        else {
+            show_error("Error getting word from the list");
+            return Err(());
+        };
+
+        let length = word.chars().count();
+
+        let word_type = if type_num == 0.0 {
+            WordType::Normal
+        } else if type_num == 1.0 {
+            WordType::Bonus
+        } else {
+            show_error("Unknown word type");
+            return Err(());
+        };
+
+        words.insert(
+            word,
+            Word {
+                word_type,
+                found: false,
+                length,
+            },
+        );
+    }
+
+    Ok(words)
+}
+
 fn parse_puzzle(data: JsValue) -> Result<Puzzle, ()> {
     let Ok(grid_str) = Reflect::get(&data, &"grid".into())
         .map_err(|_| ())
@@ -638,10 +707,12 @@ fn parse_puzzle(data: JsValue) -> Result<Puzzle, ()> {
     };
 
     let counts = parse_counts(&data, &grid)?;
+    let words = parse_words(&data)?;
 
     Ok(Puzzle {
         grid,
         counts,
+        words,
     })
 }
 
