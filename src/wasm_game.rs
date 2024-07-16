@@ -28,6 +28,7 @@ use std::collections::HashMap;
 
 const SVG_NAMESPACE: &'static str = "http://www.w3.org/2000/svg";
 const ROUTE_ID: &'static str = "route-line";
+const MIN_WORD_LENGTH: usize = 4;
 
 fn show_error(message: &str) {
     console::log_1(&message.into());
@@ -539,6 +540,11 @@ impl Wordroute {
         result
     }
 
+    fn clear_word(&mut self) {
+        self.route_start = None;
+        self.word.clear();
+    }
+
     fn show_word_message(&self, message: &str) {
         self.set_element_text(&self.word_message, message);
         // Re-add the element to trigger the animation
@@ -550,8 +556,7 @@ impl Wordroute {
 
     fn handle_escape(&mut self) {
         if self.route_start.is_some() {
-            self.route_start = None;
-            self.word.clear();
+            self.clear_word();
             let _ = self.update_word();
         }
     }
@@ -573,6 +578,39 @@ impl Wordroute {
         }
     }
 
+    fn handle_enter(&mut self) {
+        let length = self.word.chars().count();
+
+        if length < MIN_WORD_LENGTH {
+            if length > 0 {
+                self.show_word_message("Too short");
+            }
+        } else if let Some(word) = self.words.get_mut(&self.word) {
+            if std::mem::replace(&mut word.found, true) {
+                match word.word_type {
+                    WordType::Bonus => {
+                        self.show_word_message("Already found (bonus)");
+                    },
+                    WordType::Normal => {
+                        self.show_word_message("Already found");
+                    }
+                }
+            } else {
+                match word.word_type {
+                    WordType::Bonus => self.show_word_message("Bonus word!"),
+                    WordType::Normal => {
+                        self.show_word_message(&format!("+{} points!", length));
+                    }
+                }
+            }
+        } else {
+            self.show_word_message("Not in list");
+        }
+
+        self.clear_word();
+        let _ = self.update_word_route();
+    }
+
     fn handle_letter(&mut self, letter: char) {
         self.word.push(letter);
 
@@ -590,6 +628,8 @@ impl Wordroute {
             self.handle_backspace();
         } else if key == "Escape" {
             self.handle_escape();
+        } else if key == "Enter" {
+            self.handle_enter();
         } else {
             let mut chars = key.chars();
 
