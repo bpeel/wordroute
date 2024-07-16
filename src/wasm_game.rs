@@ -260,6 +260,12 @@ impl Loader {
     }
 }
 
+struct Letter {
+    group: web_sys::SvgElement,
+    starts: web_sys::SvgElement,
+    visits: web_sys::SvgElement,
+}
+
 struct Puzzle {
     grid: Grid,
     counts: GridCounts,
@@ -270,7 +276,7 @@ struct Wordroute {
     keydown_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
     game_grid: web_sys::SvgElement,
-    letters: Vec<web_sys::SvgElement>,
+    letters: Vec<Letter>,
     grid: Grid,
     counts: GridCounts,
     geometry: Geometry,
@@ -357,11 +363,31 @@ impl Wordroute {
             .ok_or_else(|| "failed to create letter element".to_string())
     }
 
+    fn create_letter_text(
+        &self,
+        text: &str,
+        y: f32,
+        font_size: f32,
+    ) -> Result<web_sys::SvgElement, String> {
+        let elem = self.create_svg_element("text")?;
+        let _ = elem.set_attribute("text-anchor", "middle");
+        let _ = elem.set_attribute("x", "0");
+        let _ = elem.set_attribute("y", &y.to_string());
+        let _ = elem.set_attribute("font-size", &font_size.to_string());
+
+        let text_node = self.context.document.create_text_node(text);
+        let _ = elem.append_with_node_1(&text_node);
+
+        Ok(elem)
+    }
+
     fn create_letters(&mut self) -> Result<(), String> {
         let hexagon_path = hexagon_path(self.geometry.radius);
 
-        let font_size = format!("{}", self.geometry.radius * 1.2);
-        let text_y_pos = format!("{}", self.geometry.radius * 0.3);
+        let font_size = self.geometry.radius * 1.2;
+        let text_y_pos = self.geometry.radius * 0.3;
+
+        let counts_font_size = self.geometry.radius * 0.2;
 
         for (x, y) in (0..self.grid.height())
             .map(|y| (0..self.grid.width()).map(move |x| (x, y)))
@@ -389,22 +415,39 @@ impl Wordroute {
 
             let _ = g.append_with_node_1(&path);
 
-            let text = self.create_svg_element("text")?;
-            let _ = text.set_attribute("text-anchor", "middle");
-            let _ = text.set_attribute("x", "0");
-            let _ = text.set_attribute("y", &text_y_pos);
-            let _ = text.set_attribute("font-size", &font_size);
-
-            let text_node = self.context.document.create_text_node(
-                &format!("{}", self.grid.at(x, y)),
-            );
-            let _ = text.append_with_node_1(&text_node);
+            let text = self.create_letter_text(
+                &self.grid.at(x, y).to_string(),
+                text_y_pos,
+                font_size,
+            )?;
 
             let _ = g.append_with_node_1(&text);
 
+            let TileCounts { starts, visits } = self.counts.at(x, y);
+
+            let starts = self.create_letter_text(
+                &starts.to_string(),
+                -self.geometry.radius * 0.7,
+                counts_font_size,
+            )?;
+            let _ = starts.set_attribute("class", "starts");
+            let _ = g.append_with_node_1(&starts);
+
+            let visits = self.create_letter_text(
+                &visits.to_string(),
+                self.geometry.radius * 0.8,
+                counts_font_size,
+            )?;
+            let _ = visits.set_attribute("class", "visits");
+            let _ = g.append_with_node_1(&visits);
+
             let _ = self.game_grid.append_with_node_1(&g);
 
-            self.letters.push(g);
+            self.letters.push(Letter {
+                group: g,
+                starts,
+                visits,
+            });
         }
 
         Ok(())

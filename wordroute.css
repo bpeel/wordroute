@@ -50,6 +50,14 @@ h1, h2 {
     stroke-linejoin: round;
 }
 
+.starts {
+    fill: #811;
+}
+
+.counts {
+    fill: #333;
+}
+
 @media only all and (max-width: 45em) {
     #content, #instructions {
         position: absolute;
