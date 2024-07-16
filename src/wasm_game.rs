@@ -450,6 +450,11 @@ impl Wordroute {
             });
         }
 
+        let _ = self.game_grid.set_attribute(
+            "viewBox",
+            &format!("0 0 {} {}", self.geometry.width, self.geometry.height),
+        );
+
         Ok(())
     }
 

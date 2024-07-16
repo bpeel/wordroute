@@ -35,6 +35,8 @@ fn half_grid_width(grid: &Grid) -> u32 {
 }
 
 pub struct Geometry {
+    pub width: f32,
+    pub height: f32,
     // Coordinates of the center of the top left hexagon
     pub top_x: f32,
     pub top_y: f32,
@@ -47,7 +49,7 @@ pub struct Geometry {
 }
 
 impl Geometry {
-    pub fn new(grid: &Grid, viewport_size: f32) -> Geometry {
+    pub fn new(grid: &Grid, viewport_width: f32) -> Geometry {
         // Number of apothems required for the width
         let width_in_apothems = half_grid_width(grid) as f32;
         // The radius of a hexagon in units of apothems
@@ -57,19 +59,14 @@ impl Geometry {
             (grid.height() - 1) as f32 * 1.5 * radius_in_apothems +
             radius_in_apothems * 2.0;
 
-        let apothem = viewport_size / width_in_apothems.max(height_in_apothems);
+        let apothem = viewport_width / width_in_apothems;
         let radius = radius_in_apothems * apothem;
 
-        let top_x = viewport_size / 2.0 -
-            width_in_apothems * apothem / 2.0 +
-            apothem;
-        let top_y = viewport_size / 2.0 -
-            height_in_apothems * apothem / 2.0 +
-            radius;
-
         Geometry {
-            top_x,
-            top_y,
+            width: viewport_width,
+            height: apothem * height_in_apothems,
+            top_x: apothem,
+            top_y: radius,
             radius,
             step_x: apothem * 2.0,
             step_y: radius * 1.5,
