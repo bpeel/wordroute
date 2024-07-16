@@ -235,6 +235,7 @@ struct Wordroute {
     keydown_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
     current_word: web_sys::HtmlElement,
+    word_message: web_sys::HtmlElement,
     game_grid: web_sys::SvgElement,
     letters: Vec<Letter>,
     grid: Grid,
@@ -266,6 +267,13 @@ impl Wordroute {
             return Err("failed to get current-word".to_string());
         };
 
+        let Some(word_message) =
+            context.document.get_element_by_id("word-message")
+            .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
+        else {
+            return Err("failed to get word-message".to_string());
+        };
+
         let Some(game_grid) = context.document.get_element_by_id("game-grid")
             .and_then(|c| c.dyn_into::<web_sys::SvgElement>().ok())
         else {
@@ -284,6 +292,7 @@ impl Wordroute {
             keydown_closure: None,
             game_contents,
             current_word,
+            word_message,
             game_grid,
             grid,
             counts,
@@ -528,6 +537,15 @@ impl Wordroute {
         self.route_steps = route_steps;
 
         result
+    }
+
+    fn show_word_message(&self, message: &str) {
+        self.set_element_text(&self.word_message, message);
+        // Re-add the element to trigger the animation
+        if let Some(parent) = self.word_message.parent_node() {
+            self.word_message.remove();
+            let _ = parent.append_child(&self.word_message);
+        }
     }
 
     fn handle_escape(&mut self) {

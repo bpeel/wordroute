@@ -13,7 +13,7 @@ body {
     min-height: 100vh;
 }
 
-h1, h2, #current-word {
+h1, h2, #current-word, #word-message {
     text-align: center;
     padding-left: 1em;
     padding-right: 1em;
@@ -24,10 +24,33 @@ h1, h2, #current-word {
     text-align: center;
 }
 
-#current-word {
+#word-container {
+    display: grid;
+}
+
+#word-message, #current-word {
     font-weight: bold;
     font-size: xx-large;
     height: 1.2em;
+    grid-area: 1 / 1 / 2 / 2;
+}
+
+#word-message {
+    background-color: #fff;
+    animation-duration: 1.0s;
+    animation-name: fade;
+    animation-timing-function: ease-out;
+    animation-delay: 2s;
+    animation-fill-mode: forwards;
+}
+
+@keyframes fade {
+    from {
+        opacity: 1.0;
+    }
+    to {
+        opacity: 0.0;
+    }
 }
 
 #game-grid {
