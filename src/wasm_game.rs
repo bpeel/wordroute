@@ -17,6 +17,7 @@
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 use super::grid::Grid;
+use super::counts::{TileCounts, GridCounts};
 use super::grid_math::Geometry;
 use super::word_finder;
 use super::directions;
@@ -182,7 +183,7 @@ impl Loader {
         self.data_error_closure = Some(error_closure);
     }
 
-    fn parse_puzzles(&mut self, data: JsValue) -> Result<Vec<Grid>, ()> {
+    fn parse_puzzle(&mut self, data: JsValue) -> Result<Puzzle, ()> {
         let Ok(grid_str) = Reflect::get(&data, &"grid".into())
             .map_err(|_| ())
             .and_then(|v| TryInto::<String>::try_into(v).map_err(|_| ()))
@@ -199,7 +200,41 @@ impl Loader {
             },
         };
 
-        Ok(vec![grid])
+        let Ok(counts_array) = Reflect::get(&data, &"counts".into())
+            .map_err(|_| ())
+            .and_then(|v| TryInto::<js_sys::Array>::try_into(v).map_err(|_| ()))
+        else {
+            show_error("Error getting puzzle counts");
+            return Err(());
+        };
+
+        let mut counts = GridCounts::new(grid.width(), grid.height());
+
+        for y in 0..grid.height() {
+            for x in 0..grid.width() {
+                let starts = get_count_value(
+                    &counts_array,
+                    (y * grid.width() + x) * 2,
+                )?;
+                let visits = get_count_value(
+                    &counts_array,
+                    (y * grid.width() + x) * 2 + 1,
+                )?;
+
+                *counts.at_mut(x, y) = TileCounts { starts, visits };
+            }
+        }
+
+        Ok(Puzzle {
+            grid,
+            counts,
+        })
+    }
+
+    fn parse_puzzles(&mut self, data: JsValue) -> Result<Vec<Puzzle>, ()> {
+        let puzzle = self.parse_puzzle(data)?;
+
+        Ok(vec![puzzle])
     }
 
     fn data_loaded(&mut self, data: JsValue) {
@@ -211,7 +246,7 @@ impl Loader {
         }
     }
 
-    fn start_game(&mut self, puzzles: Vec<Grid>) {
+    fn start_game(&mut self, puzzles: Vec<Puzzle>) {
         let Loader { context, .. } = self.stop_floating();
 
         match Wordroute::new(context, puzzles) {
@@ -225,6 +260,11 @@ impl Loader {
     }
 }
 
+struct Puzzle {
+    grid: Grid,
+    counts: GridCounts,
+}
+
 struct Wordroute {
     context: Context,
     keydown_closure: Option<Closure::<dyn Fn(JsValue)>>,
@@ -232,6 +272,7 @@ struct Wordroute {
     game_grid: web_sys::SvgElement,
     letters: Vec<web_sys::SvgElement>,
     grid: Grid,
+    counts: GridCounts,
     geometry: Geometry,
     word_finder: word_finder::Finder,
     route_start: Option<(u32, u32)>,
@@ -241,7 +282,7 @@ struct Wordroute {
 impl Wordroute {
     fn new(
         context: Context,
-        puzzles: Vec<Grid>
+        puzzles: Vec<Puzzle>
     ) -> Result<Box<Wordroute>, String> {
         let Some(game_contents) =
             context.document.get_element_by_id("game-contents")
@@ -256,7 +297,7 @@ impl Wordroute {
             return Err("failed to get game grid".to_string());
         };
 
-        let Some(grid) = puzzles.into_iter().next()
+        let Some(Puzzle { grid, counts }) = puzzles.into_iter().next()
         else {
             return Err("no puzzles available".to_string());
         };
@@ -269,6 +310,7 @@ impl Wordroute {
             game_contents,
             game_grid,
             grid,
+            counts,
             geometry,
             letters: Vec::new(),
             word_finder: word_finder::Finder::new(),
@@ -546,6 +588,13 @@ fn hexagon_path(radius: f32) -> String {
     result.push('z');
 
     result
+}
+
+fn get_count_value(array: &js_sys::Array, key: u32) -> Result<u8, ()> {
+    array.get(key).as_f64().ok_or_else(|| {
+        show_error("Error getting count value");
+        ()
+    }).map(|v| v as u8)
 }
 
 #[wasm_bindgen]

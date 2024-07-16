@@ -21,6 +21,8 @@ mod grid;
 #[cfg(any(target_arch = "wasm32", test))]
 mod grid_math;
 #[cfg(any(target_arch = "wasm32", test))]
+mod counts;
+#[cfg(any(target_arch = "wasm32", test))]
 mod directions;
 #[cfg(any(target_arch = "wasm32", test))]
 mod word_finder;
