@@ -87,6 +87,19 @@ h1, h2, #current-word, #word-message {
     fill: #333;
 }
 
+.letter.finished .starts, .letter.finished .visits {
+    display: none;
+}
+
+.letter.finished text {
+    fill: #999;
+}
+
+.letter.finished path {
+    stroke: none;
+    fill: #e8e8e8;
+}
+
 @media only all and (max-width: 45em) {
     #content, #instructions {
         position: absolute;

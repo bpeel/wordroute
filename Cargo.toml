@@ -41,6 +41,7 @@ features = [
          "RequestInit",
          "RequestCache",
          "KeyboardEvent",
+         "DomTokenList",
 ]
 
 [target."cfg(target_arch = \"wasm32\")".dependencies.js_sys]

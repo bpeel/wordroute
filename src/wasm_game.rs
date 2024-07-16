@@ -544,6 +544,21 @@ impl Wordroute {
         }
     }
 
+    fn update_counts_text(&self, x: u32, y: u32) {
+        let counts = self.counts.at(x, y);
+
+        if let Some(letter) = &self.letters[
+            ((y * self.grid.width()) + x) as usize
+        ] {
+            set_element_text(&letter.starts, &counts.starts.to_string());
+            set_element_text(&letter.visits, &counts.visits.to_string());
+
+            if counts.visits <= 0 {
+                let _ = letter.group.class_list().add_1("finished");
+            }
+        }
+    }
+
     fn remove_visits_for_word(&mut self) {
         if let Some(route) = self.word_finder.find(
             &self.grid,
@@ -551,31 +566,27 @@ impl Wordroute {
         ) {
             let (mut x, mut y) = (route.start_x, route.start_y);
 
+            // Copy the route into a local array so that we don’t have
+            // to keep an immutable reference to self
+            let mut steps = std::mem::take(&mut self.route_steps);
+            steps.clear();
+            steps.extend_from_slice(route.steps);
+
             let start = self.counts.at_mut(x, y);
             start.starts -= 1;
             start.visits -= 1;
 
-            if let Some(letter) = &mut self.letters[
-                ((y * self.grid.width()) + x) as usize
-            ] {
-                set_element_text(&letter.starts, &start.starts.to_string());
-                set_element_text(&letter.visits, &start.visits.to_string());
-            }
+            self.update_counts_text(x, y);
 
-            for &dir in route.steps.iter() {
+            for &dir in steps.iter() {
                 (x, y) = directions::step(x, y, dir);
 
-                let counts = self.counts.at_mut(x, y);
-                counts.visits -= 1;
-                if let Some(letter) = &mut self.letters[
-                    ((y * self.grid.width()) + x) as usize
-                ] {
-                    set_element_text(
-                        &letter.visits,
-                        &counts.visits.to_string()
-                    );
-                };
+                self.counts.at_mut(x, y).visits -= 1;
+
+                self.update_counts_text(x, y);
             }
+
+            self.route_steps = steps;
         }
     }
 
