@@ -544,6 +544,41 @@ impl Wordroute {
         }
     }
 
+    fn remove_visits_for_word(&mut self) {
+        if let Some(route) = self.word_finder.find(
+            &self.grid,
+            &self.word,
+        ) {
+            let (mut x, mut y) = (route.start_x, route.start_y);
+
+            let start = self.counts.at_mut(x, y);
+            start.starts -= 1;
+            start.visits -= 1;
+
+            if let Some(letter) = &mut self.letters[
+                ((y * self.grid.width()) + x) as usize
+            ] {
+                set_element_text(&letter.starts, &start.starts.to_string());
+                set_element_text(&letter.visits, &start.visits.to_string());
+            }
+
+            for &dir in route.steps.iter() {
+                (x, y) = directions::step(x, y, dir);
+
+                let counts = self.counts.at_mut(x, y);
+                counts.visits -= 1;
+                if let Some(letter) = &mut self.letters[
+                    ((y * self.grid.width()) + x) as usize
+                ] {
+                    set_element_text(
+                        &letter.visits,
+                        &counts.visits.to_string()
+                    );
+                };
+            }
+        }
+    }
+
     fn handle_escape(&mut self) {
         if self.route_start.is_some() {
             self.clear_word();
@@ -590,6 +625,7 @@ impl Wordroute {
                     WordType::Bonus => self.show_word_message("Bonus word!"),
                     WordType::Normal => {
                         self.show_word_message(&format!("+{} points!", length));
+                        self.remove_visits_for_word();
                     }
                 }
             }
