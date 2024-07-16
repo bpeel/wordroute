@@ -357,8 +357,7 @@ impl Wordroute {
         let _ = elem.set_attribute("y", &y.to_string());
         let _ = elem.set_attribute("font-size", &font_size.to_string());
 
-        let text_node = self.context.document.create_text_node(text);
-        let _ = elem.append_with_node_1(&text_node);
+        set_element_text(&elem, text);
 
         Ok(elem)
     }
@@ -445,21 +444,11 @@ impl Wordroute {
         let _ = self.game_contents.style().set_property("display", "block");
     }
 
-    fn set_element_text(&self, element: &web_sys::HtmlElement, text: &str) {
-        while let Some(child) = element.first_child() {
-            let _ = element.remove_child(&child);
-        }
-
-        let text = self.context.document.create_text_node(text);
-        let _ = element.append_with_node_1(&text);
-    }
-
     fn update_title(&self) {
         if let Some(element) = self.context.document.get_element_by_id("title")
-            .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
         {
             let value = format!("WordRoute #{}", 1);
-            self.set_element_text(&element, &value);
+            set_element_text(&element, &value);
         }
     }
 
@@ -546,7 +535,7 @@ impl Wordroute {
     }
 
     fn show_word_message(&self, message: &str) {
-        self.set_element_text(&self.word_message, message);
+        set_element_text(&self.word_message, message);
         // Re-add the element to trigger the animation
         if let Some(parent) = self.word_message.parent_node() {
             self.word_message.remove();
@@ -783,6 +772,17 @@ fn parse_puzzles(data: JsValue) -> Result<Vec<Puzzle>, ()> {
     let puzzle = parse_puzzle(data)?;
 
     Ok(vec![puzzle])
+}
+
+fn set_element_text(element: &web_sys::Element, text: &str) {
+    while let Some(child) = element.first_child() {
+        let _ = element.remove_child(&child);
+    }
+
+    if let Some(document) = element.owner_document() {
+        let text = document.create_text_node(text);
+        let _ = element.append_with_node_1(&text);
+    }
 }
 
 #[wasm_bindgen]
