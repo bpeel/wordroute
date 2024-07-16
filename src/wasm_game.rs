@@ -241,6 +241,7 @@ struct Wordroute {
     words: HashMap<String, Word>,
     geometry: Geometry,
     word_finder: word_finder::Finder,
+    word: String,
     route_start: Option<(u32, u32)>,
     route_steps: Vec<u8>,
 }
@@ -281,6 +282,7 @@ impl Wordroute {
             geometry,
             letters: Vec::new(),
             word_finder: word_finder::Finder::new(),
+            word: String::new(),
             route_start: None,
             route_steps: Vec::new(),
         });
@@ -490,29 +492,14 @@ impl Wordroute {
         Ok(())
     }
 
-    fn route_word(&self) -> String {
-        let mut word = String::new();
-
-        if let Some((mut x, mut y)) = self.route_start {
-            word.push(self.grid.at(x, y));
-
-            for &dir in self.route_steps.iter() {
-                (x, y) = directions::step(x, y, dir);
-                word.push(self.grid.at(x, y));
-            }
-        }
-
-        word
-    }
-
-    fn try_set_route_word(&mut self, word: &str) -> bool {
+    fn try_route_word(&mut self) -> bool {
         // Hack to work around the borrow checker
         let mut route_steps = std::mem::take(&mut self.route_steps);
 
         let result;
 
         if let Some(word_finder::Route { start_x, start_y, steps }) =
-            self.word_finder.find(&self.grid, &word)
+            self.word_finder.find(&self.grid, &self.word)
         {
             route_steps.clear();
             route_steps.extend(steps.into_iter());
@@ -531,19 +518,22 @@ impl Wordroute {
     fn handle_escape(&mut self) {
         if self.route_start.is_some() {
             self.route_start = None;
+            self.word.clear();
             let _ = self.update_word_route();
         }
     }
 
     fn handle_backspace(&mut self) {
         if self.route_start.is_some() {
+            self.word.pop().unwrap();
+
             if self.route_steps.pop().is_none() {
                 self.route_start = None;
             } else {
                 // Removing a character can change the route
                 // completely so let’s search for the word again
-                let word = self.route_word();
-                self.try_set_route_word(&word);
+                let try_result = self.try_route_word();
+                assert!(try_result);
             }
 
             let _ = self.update_word_route();
@@ -551,12 +541,12 @@ impl Wordroute {
     }
 
     fn handle_letter(&mut self, letter: char) {
-        let mut word = self.route_word();
+        self.word.push(letter);
 
-        word.push(letter);
-
-        if self.try_set_route_word(&word) {
+        if self.try_route_word() {
             let _ = self.update_word_route();
+        } else {
+            self.word.pop();
         }
     }
 
