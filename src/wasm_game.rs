@@ -234,6 +234,7 @@ struct Wordroute {
     context: Context,
     keydown_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
+    current_word: web_sys::HtmlElement,
     game_grid: web_sys::SvgElement,
     letters: Vec<Letter>,
     grid: Grid,
@@ -258,6 +259,13 @@ impl Wordroute {
             return Err("failed to get game contents".to_string());
         };
 
+        let Some(current_word) =
+            context.document.get_element_by_id("current-word")
+            .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
+        else {
+            return Err("failed to get current-word".to_string());
+        };
+
         let Some(game_grid) = context.document.get_element_by_id("game-grid")
             .and_then(|c| c.dyn_into::<web_sys::SvgElement>().ok())
         else {
@@ -275,6 +283,7 @@ impl Wordroute {
             context,
             keydown_closure: None,
             game_contents,
+            current_word,
             game_grid,
             grid,
             counts,
@@ -492,6 +501,12 @@ impl Wordroute {
         Ok(())
     }
 
+    fn update_word(&self) {
+        let _ = self.update_word_route();
+
+        self.current_word.set_text_content(Some(&self.word));
+    }
+
     fn try_route_word(&mut self) -> bool {
         // Hack to work around the borrow checker
         let mut route_steps = std::mem::take(&mut self.route_steps);
@@ -519,7 +534,7 @@ impl Wordroute {
         if self.route_start.is_some() {
             self.route_start = None;
             self.word.clear();
-            let _ = self.update_word_route();
+            let _ = self.update_word();
         }
     }
 
@@ -536,7 +551,7 @@ impl Wordroute {
                 assert!(try_result);
             }
 
-            let _ = self.update_word_route();
+            let _ = self.update_word();
         }
     }
 
@@ -544,7 +559,7 @@ impl Wordroute {
         self.word.push(letter);
 
         if self.try_route_word() {
-            let _ = self.update_word_route();
+            let _ = self.update_word();
         } else {
             self.word.pop();
         }
