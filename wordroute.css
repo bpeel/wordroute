@@ -58,6 +58,7 @@ h1, h2, #current-word, #word-message {
     margin-left: auto;
     margin-right: auto;
     width: 70%;
+    user-select: none;
 }
 
 .letter path {
