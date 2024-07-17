@@ -454,10 +454,10 @@ impl Wordroute {
     fn create_letters(&mut self) -> Result<(), String> {
         let hexagon_path = hexagon_path(self.geometry.radius);
 
-        let font_size = self.geometry.radius * 1.2;
-        let text_y_pos = self.geometry.radius * 0.3;
+        let font_size = self.geometry.radius;
+        let text_y_pos = self.geometry.radius * 0.25;
 
-        let counts_font_size = self.geometry.radius * 0.2;
+        let counts_font_size = self.geometry.radius * 0.3;
 
         for (x, y) in (0..self.grid.height())
             .map(|y| (0..self.grid.width()).map(move |x| (x, y)))
@@ -498,7 +498,7 @@ impl Wordroute {
 
             let starts = self.create_letter_text(
                 &starts.to_string(),
-                -self.geometry.radius * 0.7,
+                -self.geometry.radius * 0.6,
                 counts_font_size,
             )?;
             let _ = starts.set_attribute("class", "starts");
