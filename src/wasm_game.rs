@@ -749,44 +749,12 @@ impl Wordroute {
         let grid_x = pointer_x as f32 * 100.0 / client_width as f32;
         let grid_y = pointer_y as f32 * 100.0 / client_width as f32;
 
-        let tile_y = ((grid_y - (self.geometry.top_y - self.geometry.radius))
-                      / self.geometry.step_y)
-            as i32;
+        let (tile_x, tile_y) = self.geometry.reverse_coords(grid_x, grid_y);
 
-        if tile_y < 0 || tile_y as u32 >= self.grid.height() {
-            return None;
-        }
-
-        let mut tile_x = (grid_x - (self.geometry.top_x
-                                    - self.geometry.step_x / 2.0))
-            / self.geometry.step_x;
-
-        if tile_y & 1 != 0 {
-            tile_x -= 0.5;
-        }
-
-        let tile_x = tile_x as i32;
-
-        if tile_x < 0 || tile_x as u32 >= self.grid.width() {
-            return None;
-        }
-
-        // Limit the position to a smaller circle around the center to
-        // make it easier to avoid accidentally selecting neighbouring
-        // hexagons when sliding from one tile to the next.
-        let (center_x, center_y) = self.geometry.convert_coords(
-            tile_x as u32,
-            tile_y as u32,
-        );
-        let diff_x = grid_x - center_x;
-        let diff_y = grid_y - center_y;
-        let max_distance = self.geometry.radius * 0.5;
-
-        if diff_x * diff_x + diff_y * diff_y > max_distance * max_distance {
-            return None;
-        }
-
-        if self.grid.at(tile_x as u32, tile_y as u32) == '.' {
+        if tile_x >= self.grid.width() ||
+            tile_y >= self.grid.height() ||
+            self.grid.at(tile_x as u32, tile_y as u32) == '.'
+        {
             None
         } else {
             Some((tile_x as u32, tile_y as u32))
