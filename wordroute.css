@@ -64,6 +64,11 @@ h1, h2, #current-word, #word-message, #word-count {
     margin-right: auto;
     width: 70%;
     user-select: none;
+    touch-action: none;
+}
+
+#game-grid * {
+    pointer-events: none;
 }
 
 .letter path {

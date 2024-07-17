@@ -41,6 +41,7 @@ features = [
          "RequestInit",
          "RequestCache",
          "KeyboardEvent",
+         "PointerEvent",
          "DomTokenList",
 ]
 

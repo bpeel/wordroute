@@ -234,6 +234,10 @@ struct Puzzle {
 
 struct Wordroute {
     context: Context,
+    pointerdown_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    pointerup_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    pointermove_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    pointercancel_closure: Option<Closure::<dyn Fn(JsValue)>>,
     keydown_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
     word_count: web_sys::HtmlElement,
@@ -251,6 +255,7 @@ struct Wordroute {
     word: String,
     route_start: Option<(u32, u32)>,
     route_steps: Vec<u8>,
+    pointer_tail: Option<(u32, u32)>,
 }
 
 impl Wordroute {
@@ -305,6 +310,10 @@ impl Wordroute {
 
         let mut wordroute = Box::new(Wordroute {
             context,
+            pointerdown_closure: None,
+            pointerup_closure: None,
+            pointermove_closure: None,
+            pointercancel_closure: None,
             keydown_closure: None,
             game_contents,
             word_count,
@@ -322,6 +331,7 @@ impl Wordroute {
             word: String::new(),
             route_start: None,
             route_steps: Vec::new(),
+            pointer_tail: None,
         });
 
         wordroute.create_closures();
@@ -336,6 +346,66 @@ impl Wordroute {
 
     fn create_closures(&mut self) {
         let wordroute_pointer = self as *mut Wordroute;
+
+        let pointerdown_closure = Closure::<dyn Fn(JsValue)>::new(
+            move |event: JsValue| {
+                let wordroute = unsafe { &mut *wordroute_pointer };
+                let event: web_sys::PointerEvent = event.dyn_into().unwrap();
+                wordroute.handle_pointerdown_event(event);
+            }
+        );
+
+        let _ = self.game_grid.add_event_listener_with_callback(
+            "pointerdown",
+            pointerdown_closure.as_ref().unchecked_ref(),
+        );
+
+        self.pointerdown_closure = Some(pointerdown_closure);
+
+        let pointerup_closure = Closure::<dyn Fn(JsValue)>::new(
+            move |event: JsValue| {
+                let wordroute = unsafe { &mut *wordroute_pointer };
+                let event: web_sys::PointerEvent = event.dyn_into().unwrap();
+                wordroute.handle_pointerup_event(event);
+            }
+        );
+
+        let _ = self.game_grid.add_event_listener_with_callback(
+            "pointerup",
+            pointerup_closure.as_ref().unchecked_ref(),
+        );
+
+        self.pointerup_closure = Some(pointerup_closure);
+
+        let pointermove_closure = Closure::<dyn Fn(JsValue)>::new(
+            move |event: JsValue| {
+                let wordroute = unsafe { &mut *wordroute_pointer };
+                let event: web_sys::PointerEvent = event.dyn_into().unwrap();
+                wordroute.handle_pointermove_event(event);
+            }
+        );
+
+        let _ = self.game_grid.add_event_listener_with_callback(
+            "pointermove",
+            pointermove_closure.as_ref().unchecked_ref(),
+        );
+
+        self.pointermove_closure = Some(pointermove_closure);
+
+        let pointercancel_closure = Closure::<dyn Fn(JsValue)>::new(
+            move |event: JsValue| {
+                let wordroute = unsafe { &mut *wordroute_pointer };
+                let event: web_sys::PointerEvent = event.dyn_into().unwrap();
+                wordroute.handle_pointercancel_event(event);
+            }
+        );
+
+        let _ = self.game_grid.add_event_listener_with_callback(
+            "pointercancel",
+            pointercancel_closure.as_ref().unchecked_ref(),
+        );
+
+        self.pointercancel_closure = Some(pointercancel_closure);
 
         let keydown_closure = Closure::<dyn Fn(JsValue)>::new(
             move |event: JsValue| {
@@ -616,31 +686,7 @@ impl Wordroute {
         }
     }
 
-    fn handle_escape(&mut self) {
-        if self.route_start.is_some() {
-            self.clear_word();
-            let _ = self.update_word();
-        }
-    }
-
-    fn handle_backspace(&mut self) {
-        if self.route_start.is_some() {
-            self.word.pop().unwrap();
-
-            if self.route_steps.pop().is_none() {
-                self.route_start = None;
-            } else {
-                // Removing a character can change the route
-                // completely so let’s search for the word again
-                let try_result = self.try_route_word();
-                assert!(try_result);
-            }
-
-            let _ = self.update_word();
-        }
-    }
-
-    fn handle_enter(&mut self) {
+    fn send_word(&mut self) {
         let length = self.word.chars().count();
 
         if length < MIN_WORD_LENGTH {
@@ -676,13 +722,239 @@ impl Wordroute {
         let _ = self.update_word_route();
     }
 
+    fn position_for_event(
+        &self,
+        event: &web_sys::PointerEvent,
+    ) -> Option<(u32, u32)> {
+        let Some(target) = event.target()
+        else {
+            return None;
+        };
+
+        let Ok(element) = target.dyn_into::<web_sys::SvgElement>()
+        else {
+            return None;
+        };
+
+        if element != self.game_grid {
+            return None;
+        }
+
+        let pointer_x = event.offset_x();
+        let pointer_y = event.offset_y();
+        let client_width = element.client_width();
+
+        // Convert the pointer coordinates to the viewBox space of the
+        // game grid
+        let grid_x = pointer_x as f32 * 100.0 / client_width as f32;
+        let grid_y = pointer_y as f32 * 100.0 / client_width as f32;
+
+        let tile_y = ((grid_y - (self.geometry.top_y - self.geometry.radius))
+                      / self.geometry.step_y)
+            as i32;
+
+        if tile_y < 0 || tile_y as u32 >= self.grid.height() {
+            return None;
+        }
+
+        let mut tile_x = (grid_x - (self.geometry.top_x
+                                    - self.geometry.step_x / 2.0))
+            / self.geometry.step_x;
+
+        if tile_y & 1 != 0 {
+            tile_x -= 0.5;
+        }
+
+        let tile_x = tile_x as i32;
+
+        if tile_x < 0 || tile_x as u32 >= self.grid.width() {
+            return None;
+        }
+
+        // Limit the position to a smaller circle around the center to
+        // make it easier to avoid accidentally selecting neighbouring
+        // hexagons when sliding from one tile to the next.
+        let (center_x, center_y) = self.geometry.convert_coords(
+            tile_x as u32,
+            tile_y as u32,
+        );
+        let diff_x = grid_x - center_x;
+        let diff_y = grid_y - center_y;
+        let max_distance = self.geometry.radius * 0.5;
+
+        if diff_x * diff_x + diff_y * diff_y > max_distance * max_distance {
+            return None;
+        }
+
+        if self.grid.at(tile_x as u32, tile_y as u32) == '.' {
+            None
+        } else {
+            Some((tile_x as u32, tile_y as u32))
+        }
+    }
+
+    fn handle_escape(&mut self) {
+        if self.route_start.is_some() && self.pointer_tail.is_none() {
+            self.clear_word();
+            let _ = self.update_word();
+        }
+    }
+
+    fn handle_backspace(&mut self) {
+        if self.route_start.is_some() && self.pointer_tail.is_none() {
+            self.word.pop().unwrap();
+
+            if self.route_steps.pop().is_none() {
+                self.route_start = None;
+            } else {
+                // Removing a character can change the route
+                // completely so let’s search for the word again
+                let try_result = self.try_route_word();
+                assert!(try_result);
+            }
+
+            let _ = self.update_word();
+        }
+    }
+
+    fn handle_enter(&mut self) {
+        if self.pointer_tail.is_some() {
+            return;
+        }
+
+        self.send_word();
+    }
+
     fn handle_letter(&mut self, letter: char) {
+        if self.pointer_tail.is_some() {
+            return;
+        }
+
         self.word.push(letter);
 
         if self.try_route_word() {
             let _ = self.update_word();
         } else {
             self.word.pop();
+        }
+    }
+
+    fn handle_pointerdown_event(&mut self, event: web_sys::PointerEvent) {
+        if !event.is_primary() || event.button() != 0 {
+            return;
+        }
+
+        event.prevent_default();
+
+        let Some(position) = self.position_for_event(&event)
+        else {
+            return;
+        };
+
+        let _ = self.game_grid.set_pointer_capture(event.pointer_id());
+
+        self.pointer_tail = Some(position);
+        self.route_start = Some(position);
+        self.route_steps.clear();
+        self.word.clear();
+        self.word.push(self.grid.at(position.0, position.1));
+        let _ = self.update_word();
+    }
+
+    fn handle_pointerup_event(&mut self, event: web_sys::PointerEvent) {
+        if !event.is_primary() || event.button() != 0 {
+            return;
+        }
+
+        event.prevent_default();
+
+        if self.pointer_tail.take().is_none() {
+            return;
+        }
+
+        let _ = self.game_grid.release_pointer_capture(event.pointer_id());
+
+        if self.position_for_event(&event).is_none() {
+            if !self.route_steps.is_empty() {
+                self.show_word_message("Cancel");
+            }
+            self.clear_word();
+            self.update_word();
+        } else {
+            self.send_word();
+        }
+    }
+
+    fn handle_pointermove_event(&mut self, event: web_sys::PointerEvent) {
+        if !event.is_primary() {
+            return;
+        }
+
+        event.prevent_default();
+
+        let Some((last_x, last_y)) = self.pointer_tail
+        else {
+            return;
+        };
+
+        let Some((start_x, start_y)) = self.route_start
+        else {
+            return;
+        };
+
+        let Some(position) = self.position_for_event(&event)
+        else {
+            return;
+        };
+
+        // If we’re moving back a space then undo the last move
+        if Some(position) == self.route_steps.last().map(|&dir| {
+            directions::reverse(last_x, last_y, dir)
+        }) {
+            self.route_steps.pop().unwrap();
+            self.word.pop().unwrap();
+            self.pointer_tail = Some(position);
+            let _ = self.update_word();
+        } else {
+            // Can we get here from the previous position?
+            let dir = 'find_direction: {
+                for dir in 0..directions::N_DIRECTIONS {
+                    if position == directions::step(last_x, last_y, dir) {
+                        break 'find_direction dir;
+                    }
+                }
+
+                return;
+            };
+
+            // Have we already visited this space?
+            let mut x = start_x;
+            let mut y = start_y;
+
+            for &dir in self.route_steps.iter() {
+                if (x, y) == position {
+                    return;
+                }
+
+                (x, y) = directions::step(x, y, dir);
+            }
+
+            self.route_steps.push(dir);
+            self.word.push(self.grid.at(position.0, position.1));
+            self.pointer_tail = Some(position);
+            let _ = self.update_word();
+        }
+    }
+
+    fn handle_pointercancel_event(&mut self, event: web_sys::PointerEvent) {
+        if !event.is_primary() {
+            return;
+        }
+
+        if self.pointer_tail.is_some() {
+            self.pointer_tail = None;
+            self.clear_word();
+            self.update_word();
         }
     }
 
