@@ -214,6 +214,7 @@ struct Letter {
     visits: web_sys::SvgElement,
 }
 
+#[derive(PartialEq, Eq)]
 enum WordType {
     Normal,
     Bonus,
@@ -235,6 +236,7 @@ struct Wordroute {
     context: Context,
     keydown_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
+    word_count: web_sys::HtmlElement,
     current_word: web_sys::HtmlElement,
     word_message: web_sys::HtmlElement,
     game_grid: web_sys::SvgElement,
@@ -242,6 +244,8 @@ struct Wordroute {
     grid: Grid,
     counts: GridCounts,
     words: HashMap<String, Word>,
+    n_words_found: usize,
+    total_n_words: usize,
     geometry: Geometry,
     word_finder: word_finder::Finder,
     word: String,
@@ -259,6 +263,13 @@ impl Wordroute {
             .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
         else {
             return Err("failed to get game contents".to_string());
+        };
+
+        let Some(word_count) =
+            context.document.get_element_by_id("word-count")
+            .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
+        else {
+            return Err("failed to get current-word".to_string());
         };
 
         let Some(current_word) =
@@ -288,16 +299,23 @@ impl Wordroute {
 
         let geometry = Geometry::new(&grid, 100.0);
 
+        let total_n_words = words.values().filter(|w| {
+            w.word_type == WordType::Normal
+        }).count();
+
         let mut wordroute = Box::new(Wordroute {
             context,
             keydown_closure: None,
             game_contents,
+            word_count,
             current_word,
             word_message,
             game_grid,
             grid,
             counts,
             words,
+            n_words_found: 0,
+            total_n_words,
             geometry,
             letters: Vec::new(),
             word_finder: word_finder::Finder::new(),
@@ -309,6 +327,7 @@ impl Wordroute {
         wordroute.create_closures();
         wordroute.update_title();
         wordroute.create_letters()?;
+        wordroute.update_word_count();
 
         wordroute.show_game_contents();
 
@@ -544,6 +563,13 @@ impl Wordroute {
         }
     }
 
+    fn update_word_count(&self) {
+        set_element_text(
+            &self.word_count,
+            &format!("{} / {} words", self.n_words_found, self.total_n_words),
+        );
+    }
+
     fn update_counts_text(&self, x: u32, y: u32) {
         let counts = self.counts.at(x, y);
 
@@ -637,6 +663,8 @@ impl Wordroute {
                     WordType::Normal => {
                         self.show_word_message(&format!("+{} points!", length));
                         self.remove_visits_for_word();
+                        self.n_words_found += 1;
+                        self.update_word_count();
                     }
                 }
             }
