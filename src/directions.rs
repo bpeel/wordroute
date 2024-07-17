@@ -50,6 +50,13 @@ pub fn step(x: u32, y: u32, direction: u8) -> (u32, u32) {
     (x.wrapping_add_signed(x_off), y.wrapping_add_signed(y_off))
 }
 
+#[cfg(any(target_arch = "wasm32", test))]
+// Given a position and the direction that was used to get there,
+// return the starting position.
+pub fn reverse(x: u32, y: u32, direction: u8) -> (u32, u32) {
+    step(x, y, 5 - direction)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -80,5 +87,13 @@ mod test {
         // a single comparison against the dimensions of the grid.
         assert_eq!(step(0, 0, 2), (u32::MAX, 0));
         assert_eq!(step(0, 0, 1), (0, u32::MAX));
+    }
+
+    #[test]
+    fn reverse_matches_step() {
+        for dir in 0..N_DIRECTIONS {
+            let next = step(2, 1, dir);
+            assert_eq!(reverse(next.0, next.1, dir), (2, 1));
+        }
     }
 }
