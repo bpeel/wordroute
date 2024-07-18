@@ -54,6 +54,19 @@ h1, h2, #current-word, #word-message, #word-count {
     animation-fill-mode: forwards;
 }
 
+#word-lists h2 {
+    text-align: left;
+}
+
+#word-lists div {
+    margin-left: 1em;
+}
+
+#word-lists span {
+    display: inline-block;
+    font-size: x-large;
+}
+
 @keyframes fade {
     from {
         opacity: 1.0;

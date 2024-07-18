@@ -24,7 +24,7 @@ use super::directions;
 use std::fmt::Write;
 use js_sys::Reflect;
 use std::f32::consts::PI;
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
 
 const SVG_NAMESPACE: &'static str = "http://www.w3.org/2000/svg";
 const ROUTE_ID: &'static str = "route-line";
@@ -256,6 +256,7 @@ struct Wordroute {
     route_start: Option<(u32, u32)>,
     route_steps: Vec<u8>,
     pointer_tail: Option<(u32, u32)>,
+    word_lists: HashMap<usize, web_sys::HtmlElement>,
 }
 
 impl Wordroute {
@@ -332,12 +333,15 @@ impl Wordroute {
             route_start: None,
             route_steps: Vec::new(),
             pointer_tail: None,
+            word_lists: HashMap::new(),
         });
 
         wordroute.create_closures();
         wordroute.update_title();
         wordroute.create_letters()?;
+        wordroute.create_word_lists()?;
         wordroute.update_word_count();
+        wordroute.update_all_word_lists();
 
         wordroute.show_game_contents();
 
@@ -529,6 +533,118 @@ impl Wordroute {
         Ok(())
     }
 
+    fn create_word_lists(&mut self) -> Result<(), String> {
+        let Some(word_lists_element) =
+            self.context.document.get_element_by_id("word-lists")
+        else {
+            return Err("failed to get word-lists element".to_string());
+        };
+
+        let mut lengths = self.words.values()
+            .map(|word| word.length)
+            .collect::<Vec<_>>();
+        lengths.sort_unstable();
+
+        for length in lengths.into_iter() {
+            if let hash_map::Entry::Vacant(entry) =
+                self.word_lists.entry(length)
+            {
+                let Ok(title) = self.context.document.create_element("h2")
+                else {
+                    return Err("error creating title".to_string());
+                };
+
+                set_element_text(&title, &format!("{} letters", length));
+
+                let _ = word_lists_element.append_with_node_1(&title);
+
+                let Some(div) = self.context.document.create_element("div").ok()
+                    .and_then(|d| d.dyn_into::<web_sys::HtmlElement>().ok())
+                else {
+                    return Err("error creating div".to_string());
+                };
+
+                let _ = word_lists_element.append_with_node_1(&div);
+
+                entry.insert(div);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn update_word_list_for_length(&self, length: usize) {
+        let Some(div) = self.word_lists.get(&length)
+        else {
+            return;
+        };
+
+        clear_element(div);
+
+        let Ok(list_div) = self.context.document.create_element("div")
+        else {
+            return;
+        };
+
+        let _ = div.append_with_node_1(&list_div);
+
+        let mut missing_word_count = 0;
+        let mut found_words = Vec::new();
+
+        for (key, word) in self.words.iter() {
+            if word.length != length || word.word_type != WordType::Normal {
+                continue;
+            }
+
+            if word.found {
+                found_words.push(key);
+            } else {
+                missing_word_count += 1;
+            }
+        }
+
+        found_words.sort_unstable();
+
+        let width = format!("{}em", length as f32 * 0.9);
+
+        for &word in found_words.iter() {
+            let Some(span) = self.context.document.create_element("span").ok()
+                .and_then(|d| d.dyn_into::<web_sys::HtmlElement>().ok())
+            else {
+                continue;
+            };
+
+            let _ = span.style().set_property("width", &width);
+
+            set_element_text(&span, word);
+
+            let _ = list_div.append_with_node_1(&span);
+        }
+
+        if missing_word_count > 0 {
+            if let Ok(missing_div) =
+                self.context.document.create_element("div")
+            {
+                if missing_word_count == 1 {
+                    set_element_text(&missing_div, "+1 word left");
+                } else {
+                    set_element_text(
+                        &missing_div,
+                        &format!("+{} words left", missing_word_count),
+                    );
+                }
+
+                let _ = div.append_with_node_1(&missing_div);
+            }
+        }
+    }
+
+    fn update_all_word_lists(&self) {
+        for &length in self.word_lists.keys() {
+            self.update_word_list_for_length(length);
+        }
+    }
+
     fn show_game_contents(&self) {
         let _ = self.context.message.style().set_property("display", "none");
         let _ = self.game_contents.style().set_property("display", "block");
@@ -711,6 +827,7 @@ impl Wordroute {
                         self.remove_visits_for_word();
                         self.n_words_found += 1;
                         self.update_word_count();
+                        self.update_word_list_for_length(length);
                     }
                 }
             }
@@ -1090,10 +1207,14 @@ fn parse_puzzles(data: JsValue) -> Result<Vec<Puzzle>, ()> {
     Ok(vec![puzzle])
 }
 
-fn set_element_text(element: &web_sys::Element, text: &str) {
+fn clear_element(element: &web_sys::Element) {
     while let Some(child) = element.first_child() {
         let _ = element.remove_child(&child);
     }
+}
+
+fn set_element_text(element: &web_sys::Element, text: &str) {
+    clear_element(element);
 
     if let Some(document) = element.owner_document() {
         let text = document.create_text_node(text);
