@@ -139,6 +139,20 @@ h1, h2, #current-word, #word-message, #word-count {
     fill: #e8e8e8;
 }
 
+#score-meter {
+    width: 50%;
+    height: 2em;
+    border: 0.1em solid black;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#score-bar {
+    position: relative;
+    height: 100%;
+    background-color: #009688;
+}
+
 @media only all and (max-width: 45em) {
     #content, #instructions {
         position: absolute;

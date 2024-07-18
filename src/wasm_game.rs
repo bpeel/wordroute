@@ -244,6 +244,7 @@ struct Wordroute {
     hints_changed_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
     word_count: web_sys::HtmlElement,
+    score_bar: web_sys::HtmlElement,
     current_word: web_sys::HtmlElement,
     word_message: web_sys::HtmlElement,
     game_grid: web_sys::SvgElement,
@@ -253,6 +254,8 @@ struct Wordroute {
     words: HashMap<String, Word>,
     n_words_found: usize,
     total_n_words: usize,
+    n_letters_found: usize,
+    total_n_letters: usize,
     geometry: Geometry,
     word_finder: word_finder::Finder,
     word: String,
@@ -278,6 +281,13 @@ impl Wordroute {
 
         let Some(word_count) =
             context.document.get_element_by_id("word-count")
+            .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
+        else {
+            return Err("failed to get current-word".to_string());
+        };
+
+        let Some(score_bar) =
+            context.document.get_element_by_id("score-bar")
             .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
         else {
             return Err("failed to get current-word".to_string());
@@ -314,6 +324,14 @@ impl Wordroute {
             w.word_type == WordType::Normal
         }).count();
 
+        let total_n_letters = words.values().filter_map(|w| {
+            if w.word_type == WordType::Normal {
+                Some(w.length)
+            } else {
+                None
+            }
+        }).sum::<usize>();
+
         let mut wordroute = Box::new(Wordroute {
             context,
             pointerdown_closure: None,
@@ -324,6 +342,7 @@ impl Wordroute {
             hints_changed_closure: None,
             game_contents,
             word_count,
+            score_bar,
             current_word,
             word_message,
             game_grid,
@@ -332,6 +351,8 @@ impl Wordroute {
             words,
             n_words_found: 0,
             total_n_words,
+            n_letters_found: 0,
+            total_n_letters,
             geometry,
             letters: Vec::new(),
             word_finder: word_finder::Finder::new(),
@@ -349,6 +370,7 @@ impl Wordroute {
         wordroute.create_letters()?;
         wordroute.create_word_lists()?;
         wordroute.update_word_count();
+        wordroute.update_score_bar();
         wordroute.update_all_word_lists();
 
         wordroute.show_game_contents();
@@ -817,6 +839,13 @@ impl Wordroute {
         );
     }
 
+    fn update_score_bar(&self) {
+        let _ = self.score_bar.style().set_property(
+            "width",
+            &format!("{}%", self.n_letters_found * 100 / self.total_n_letters),
+        );
+    }
+
     fn update_counts_text(&self, x: u32, y: u32) {
         let counts = self.counts.at(x, y);
 
@@ -888,6 +917,8 @@ impl Wordroute {
                         self.remove_visits_for_word();
                         self.n_words_found += 1;
                         self.update_word_count();
+                        self.n_letters_found += length;
+                        self.update_score_bar();
                         self.update_word_list_for_length(length);
                     }
                 }
