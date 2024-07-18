@@ -864,6 +864,54 @@ impl Wordroute {
         }
     }
 
+    fn update_next_level_marker(&self) {
+        let Some(marker) = self.context.document.get_element_by_id(
+            "next-level-marker"
+        ).and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
+        else {
+            return;
+        };
+
+        let _ = marker.style().set_property(
+            "display",
+            if self.hint_level + 1 < N_HINT_LEVELS {
+                "block"
+            } else {
+                "none"
+            },
+        );
+
+        let mut marker_text = String::new();
+        let left_anchor = self.hint_level + 1 <= N_HINT_LEVELS / 2;
+
+        if left_anchor {
+            marker_text.push_str("⇤ ");
+        }
+        marker_text.push_str("next hint");
+        if !left_anchor {
+            marker_text.push_str(" ⇥");
+        }
+
+        set_element_text(&marker, &marker_text);
+
+        if left_anchor {
+            let _ = marker.style().set_property(
+                "left",
+                &format!("{}%", (self.hint_level + 1) * 100 / N_HINT_LEVELS),
+            );
+            let _ = marker.style().remove_property("right");
+        } else {
+            let _ = marker.style().set_property(
+                "right",
+                &format!(
+                    "{}%",
+                    100 - (self.hint_level + 1) * 100 / N_HINT_LEVELS
+                ),
+            );
+            let _ = marker.style().remove_property("left");
+        }
+    }
+
     fn update_hint_level(&mut self) {
         let new_hint_level = self.n_letters_found *
             N_HINT_LEVELS /
@@ -884,6 +932,8 @@ impl Wordroute {
                 "no-words-hint",
                 self.hint_level < WORDS_HINT_LEVEL,
             );
+
+            self.update_next_level_marker();
         }
     }
 

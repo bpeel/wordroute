@@ -152,6 +152,7 @@ h1, h2, #current-word, #word-message, #word-count {
 }
 
 #score-meter {
+    position: relative;
     width: 50%;
     height: 2em;
     border: 0.1em solid black;
@@ -159,8 +160,13 @@ h1, h2, #current-word, #word-message, #word-count {
     margin-right: auto;
 }
 
+#next-level-marker {
+    position: absolute;
+    font-size: 1.3em;
+}
+
 #score-bar {
-    position: relative;
+    position: absolute;
     height: 100%;
     background-color: #009688;
 }
