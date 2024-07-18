@@ -138,7 +138,7 @@ impl Loader {
     }
 
     fn queue_data_load(&mut self) {
-        let filename = "puzzle.json";
+        let filename = "puzzles.json";
 
         let floating_pointer = self.floating_pointer.unwrap();
 
@@ -204,13 +204,17 @@ impl Loader {
     fn start_game(&mut self, puzzles: Vec<Puzzle>) {
         let Loader { context, .. } = self.stop_floating();
 
-        match Wordroute::new(context, puzzles) {
-            Ok(wordroute) => {
-                // Leak the main wordroute object so that it will live as
-                // long as the web page
-                std::mem::forget(wordroute);
-            },
-            Err(e) => show_error(&e.to_string()),
+        if let Some(puzzle_num) = get_chosen_puzzle(&context) {
+            match Wordroute::new(context, puzzles, puzzle_num) {
+                Ok(wordroute) => {
+                    // Leak the main wordroute object so that it will live as
+                    // long as the web page
+                    std::mem::forget(wordroute);
+                },
+                Err(e) => show_error(&e.to_string()),
+            }
+        } else {
+            build_puzzle_list(&context, puzzles);
         }
     }
 }
@@ -276,7 +280,8 @@ struct Wordroute {
 impl Wordroute {
     fn new(
         context: Context,
-        puzzles: Vec<Puzzle>
+        puzzles: Vec<Puzzle>,
+        chosen_puzzle: usize,
     ) -> Result<Box<Wordroute>, String> {
         let Some(game_contents) =
             context.document.get_element_by_id("game-contents")
@@ -319,9 +324,11 @@ impl Wordroute {
             return Err("failed to get game grid".to_string());
         };
 
-        let Some(Puzzle { grid, counts, words }) = puzzles.into_iter().next()
+        let Some(Puzzle { grid, counts, words }) = puzzles
+            .into_iter()
+            .nth(chosen_puzzle.wrapping_sub(1))
         else {
-            return Err("no puzzles available".to_string());
+            return Err("chosen puzzle is not available".to_string());
         };
 
         let geometry = Geometry::new(&grid, 100.0);
@@ -373,7 +380,7 @@ impl Wordroute {
         });
 
         wordroute.create_closures();
-        wordroute.update_title();
+        wordroute.update_title(chosen_puzzle);
         wordroute.create_letters()?;
         wordroute.create_word_lists()?;
         wordroute.update_word_count();
@@ -741,10 +748,10 @@ impl Wordroute {
         let _ = self.game_contents.style().set_property("display", "block");
     }
 
-    fn update_title(&self) {
+    fn update_title(&self, chosen_puzzle: usize) {
         if let Some(element) = self.context.document.get_element_by_id("title")
         {
-            let value = format!("WordRoute #{}", 1);
+            let value = format!("WordRoute #{}", chosen_puzzle);
             set_element_text(&element, &value);
         }
     }
@@ -1400,9 +1407,19 @@ fn parse_puzzle(data: JsValue) -> Result<Puzzle, ()> {
 }
 
 fn parse_puzzles(data: JsValue) -> Result<Vec<Puzzle>, ()> {
-    let puzzle = parse_puzzle(data)?;
+    let Ok(puzzle_array) = TryInto::<js_sys::Array>::try_into(data)
+    else {
+        show_error("Error getting puzzle array");
+        return Err(());
+    };
 
-    Ok(vec![puzzle])
+    let mut puzzles = Vec::new();
+
+    for data in puzzle_array.iter() {
+        puzzles.push(parse_puzzle(data)?);
+    }
+
+    Ok(puzzles)
 }
 
 fn clear_element(element: &web_sys::Element) {
@@ -1418,6 +1435,73 @@ fn set_element_text(element: &web_sys::Element, text: &str) {
         let text = document.create_text_node(text);
         let _ = element.append_with_node_1(&text);
     }
+}
+
+fn get_chosen_puzzle(context: &Context) -> Option<usize> {
+    let location = context.document.location()?;
+    let search = location.search().ok()?;
+    let params = web_sys::UrlSearchParams::new_with_str(&search).ok()?;
+    let puzzle_jsvalue = params.get("p")?;
+    let puzzle_str: String = puzzle_jsvalue.try_into().ok()?;
+
+    puzzle_str.parse::<usize>().ok()
+}
+
+fn build_puzzle_list(context: &Context, puzzles: Vec<Puzzle>) {
+    let Some(puzzle_list) = context.document.get_element_by_id("puzzle-list")
+    else {
+        show_error("Error getting puzzle list");
+        return;
+    };
+
+    let Some(path_name) = context.document.location()
+        .and_then(|location| location.pathname().ok())
+    else {
+        show_error("Error getting location path name");
+        return;
+    };
+
+    for (puzzle_num, puzzle) in puzzles.into_iter().enumerate() {
+        let Ok(li) = context.document.create_element("li")
+        else {
+            continue;
+        };
+
+        let Ok(a) = context.document.create_element("a")
+        else {
+            continue;
+        };
+
+        set_element_text(&a, &format!("Puzzle {}", puzzle_num + 1));
+
+        let _ = a.set_attribute(
+            "href",
+            &format!("{}?p={}", path_name, puzzle_num + 1),
+        );
+
+        let _ = li.append_with_node_1(&a);
+
+        let detail = context.document.create_text_node(
+            &format!(
+                " – {} words",
+                puzzle.words.values()
+                    .filter(|word| word.word_type == WordType::Normal)
+                    .count(),
+            ),
+        );
+
+        let _ = li.append_with_node_1(&detail);
+
+        let _ = puzzle_list.append_with_node_1(&li);
+    }
+
+    let _ = context.message.style().set_property("display", "none");
+
+    if let Some(puzzle_selector) = context.document.get_element_by_id(
+        "puzzle-selector",
+    ).and_then(|ps| ps.dyn_into::<web_sys::HtmlElement>().ok()) {
+        let _ = puzzle_selector.style().set_property("display", "block");
+    };
 }
 
 #[wasm_bindgen]

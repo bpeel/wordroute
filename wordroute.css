@@ -58,8 +58,9 @@ h1, h2, #current-word, #word-message, #word-count {
     text-align: left;
 }
 
-#word-lists div {
+#word-lists div, #puzzle-selector {
     margin-left: 1em;
+    margin-right: 1em;
 }
 
 #word-lists span {
