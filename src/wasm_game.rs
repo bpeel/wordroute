@@ -29,6 +29,8 @@ use std::collections::{hash_map, HashMap};
 const SVG_NAMESPACE: &'static str = "http://www.w3.org/2000/svg";
 const ROUTE_ID: &'static str = "route-line";
 const MIN_WORD_LENGTH: usize = 4;
+const SORT_HINT_CHECKBOX_ID: &'static str = "sort-hint-checkbox";
+const LETTERS_HINT_CHECKBOX_ID: &'static str = "letters-hint-checkbox";
 
 fn show_error(message: &str) {
     console::log_1(&message.into());
@@ -239,6 +241,7 @@ struct Wordroute {
     pointermove_closure: Option<Closure::<dyn Fn(JsValue)>>,
     pointercancel_closure: Option<Closure::<dyn Fn(JsValue)>>,
     keydown_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    hints_changed_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
     word_count: web_sys::HtmlElement,
     current_word: web_sys::HtmlElement,
@@ -257,6 +260,8 @@ struct Wordroute {
     route_steps: Vec<u8>,
     pointer_tail: Option<(u32, u32)>,
     word_lists: HashMap<usize, web_sys::HtmlElement>,
+    sort_word_lists: bool,
+    show_some_letters: bool,
 }
 
 impl Wordroute {
@@ -316,6 +321,7 @@ impl Wordroute {
             pointermove_closure: None,
             pointercancel_closure: None,
             keydown_closure: None,
+            hints_changed_closure: None,
             game_contents,
             word_count,
             current_word,
@@ -334,6 +340,8 @@ impl Wordroute {
             route_steps: Vec::new(),
             pointer_tail: None,
             word_lists: HashMap::new(),
+            sort_word_lists: false,
+            show_some_letters: false,
         });
 
         wordroute.create_closures();
@@ -425,6 +433,24 @@ impl Wordroute {
         );
 
         self.keydown_closure = Some(keydown_closure);
+
+        let hints_changed_closure = Closure::<dyn Fn(JsValue)>::new(
+            move |_event: JsValue| {
+                let wordroute = unsafe { &mut *wordroute_pointer };
+                wordroute.handle_hints_changed();
+            }
+        );
+
+        for id in [SORT_HINT_CHECKBOX_ID, LETTERS_HINT_CHECKBOX_ID].iter() {
+            if let Some(element) = self.context.document.get_element_by_id(id) {
+                let _ = element.add_event_listener_with_callback(
+                    "change",
+                    hints_changed_closure.as_ref().unchecked_ref(),
+                );
+            }
+        }
+
+        self.hints_changed_closure = Some(hints_changed_closure);
     }
 
     fn create_svg_element(
@@ -596,18 +622,32 @@ impl Wordroute {
                 continue;
             }
 
-            if word.found {
-                found_words.push(key);
+            if word.found || self.show_some_letters || self.sort_word_lists {
+                found_words.push((key, word.found));
             } else {
                 missing_word_count += 1;
             }
         }
 
-        found_words.sort_unstable();
+        found_words.sort_unstable_by_key(|&(word, found)| {
+            (!found && !self.sort_word_lists, word)
+        });
 
         let width = format!("{}em", length as f32 * 0.9);
 
-        for &word in found_words.iter() {
+        let (start_letters, end_letters);
+
+        if self.show_some_letters {
+            start_letters = length.saturating_sub(2) / 2;
+            end_letters = length.saturating_sub(3) / 4;
+        } else {
+            start_letters = 0;
+            end_letters = 0;
+        };
+
+        let mut text_buf = String::new();
+
+        for &(word, found) in found_words.iter() {
             let Some(span) = self.context.document.create_element("span").ok()
                 .and_then(|d| d.dyn_into::<web_sys::HtmlElement>().ok())
             else {
@@ -616,7 +656,28 @@ impl Wordroute {
 
             let _ = span.style().set_property("width", &width);
 
-            set_element_text(&span, word);
+            if found {
+                set_element_text(&span, word);
+            } else {
+                let mut chars = word.chars();
+
+                text_buf.clear();
+
+                for _ in 0..start_letters {
+                    text_buf.push(chars.next().unwrap());
+                }
+
+                for _ in 0..(length - start_letters - end_letters) {
+                    text_buf.push('*');
+                    let _ = chars.next();
+                }
+
+                for _ in 0..end_letters {
+                    text_buf.push(chars.next().unwrap());
+                }
+
+                set_element_text(&span, &text_buf);
+            }
 
             let _ = list_div.append_with_node_1(&span);
         }
@@ -878,6 +939,13 @@ impl Wordroute {
         }
     }
 
+    fn get_checkbox_value(&self, checkbox_id: &str) -> bool {
+        self.context.document.get_element_by_id(checkbox_id)
+            .and_then(|e| e.dyn_into::<web_sys::HtmlInputElement>().ok())
+            .map(|c| c.checked())
+            .unwrap_or(false)
+    }
+
     fn handle_escape(&mut self) {
         if self.route_start.is_some() && self.pointer_tail.is_none() {
             self.clear_word();
@@ -1061,6 +1129,13 @@ impl Wordroute {
                 }
             }
         }
+    }
+
+    fn handle_hints_changed(&mut self) {
+        self.sort_word_lists = self.get_checkbox_value(SORT_HINT_CHECKBOX_ID);
+        self.show_some_letters =
+            self.get_checkbox_value(LETTERS_HINT_CHECKBOX_ID);
+        self.update_all_word_lists();
     }
 }
 

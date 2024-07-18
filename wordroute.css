@@ -67,6 +67,16 @@ h1, h2, #current-word, #word-message, #word-count {
     font-size: x-large;
 }
 
+#hint-checkboxes {
+    margin-top: 1em;
+}
+
+#hint-checkboxes label {
+    display: block;
+    font-size: large;
+    margin-left: 1em;
+}
+
 @keyframes fade {
     from {
         opacity: 1.0;

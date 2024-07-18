@@ -36,6 +36,7 @@ features = [
          "HtmlDocument",
          "Response",
          "HtmlElement",
+         "HtmlInputElement",
          "SvgElement",
          "Text",
          "RequestInit",
