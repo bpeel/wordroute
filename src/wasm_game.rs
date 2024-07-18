@@ -32,6 +32,11 @@ const MIN_WORD_LENGTH: usize = 4;
 const SORT_HINT_CHECKBOX_ID: &'static str = "sort-hint-checkbox";
 const LETTERS_HINT_CHECKBOX_ID: &'static str = "letters-hint-checkbox";
 
+const N_HINT_LEVELS: usize = 4;
+const STARTS_HINT_LEVEL: usize = 1;
+const VISITS_HINT_LEVEL: usize = 2;
+const WORDS_HINT_LEVEL: usize = 3;
+
 fn show_error(message: &str) {
     console::log_1(&message.into());
 
@@ -265,6 +270,7 @@ struct Wordroute {
     word_lists: HashMap<usize, web_sys::HtmlElement>,
     sort_word_lists: bool,
     show_some_letters: bool,
+    hint_level: usize,
 }
 
 impl Wordroute {
@@ -363,6 +369,7 @@ impl Wordroute {
             word_lists: HashMap::new(),
             sort_word_lists: false,
             show_some_letters: false,
+            hint_level: usize::MAX,
         });
 
         wordroute.create_closures();
@@ -372,6 +379,7 @@ impl Wordroute {
         wordroute.update_word_count();
         wordroute.update_score_bar();
         wordroute.update_all_word_lists();
+        wordroute.update_hint_level();
 
         wordroute.show_game_contents();
 
@@ -846,6 +854,39 @@ impl Wordroute {
         );
     }
 
+    fn set_hint_style(&self, style: &str, value: bool) {
+        let class_list = self.game_contents.class_list();
+
+        if value {
+            let _ = class_list.add_1(style);
+        } else {
+            let _ = class_list.remove_1(style);
+        }
+    }
+
+    fn update_hint_level(&mut self) {
+        let new_hint_level = self.n_letters_found *
+            N_HINT_LEVELS /
+            self.total_n_letters;
+
+        if new_hint_level != self.hint_level {
+            self.hint_level = new_hint_level;
+
+            self.set_hint_style(
+                "no-starts-hint",
+                self.hint_level < STARTS_HINT_LEVEL,
+            );
+            self.set_hint_style(
+                "no-visits-hint",
+                self.hint_level < VISITS_HINT_LEVEL,
+            );
+            self.set_hint_style(
+                "no-words-hint",
+                self.hint_level < WORDS_HINT_LEVEL,
+            );
+        }
+    }
+
     fn update_counts_text(&self, x: u32, y: u32) {
         let counts = self.counts.at(x, y);
 
@@ -919,6 +960,7 @@ impl Wordroute {
                         self.update_word_count();
                         self.n_letters_found += length;
                         self.update_score_bar();
+                        self.update_hint_level();
                         self.update_word_list_for_length(length);
                     }
                 }

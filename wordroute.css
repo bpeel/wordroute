@@ -126,6 +126,18 @@ h1, h2, #current-word, #word-message, #word-count {
     fill: #333;
 }
 
+.no-starts-hint .starts {
+    display: none;
+}
+
+.no-visits-hint .visits {
+    display: none;
+}
+
+.no-words-hint #hint-checkboxes {
+    display: none;
+}
+
 .letter.finished .starts, .letter.finished .visits {
     display: none;
 }
