@@ -153,16 +153,18 @@ h1, h2, #current-word, #word-message, #word-count {
 
 #score-meter {
     position: relative;
-    width: 50%;
+    width: 60%;
     height: 2em;
     border: 0.1em solid black;
     margin-left: auto;
     margin-right: auto;
+    overflow: hidden;
 }
 
 #next-level-marker {
     position: absolute;
     font-size: 1.3em;
+    white-space: nowrap;
 }
 
 #score-bar {
