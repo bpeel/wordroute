@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt;
+use std::fmt::{self, Write};
 use std::str::FromStr;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct SaveState {
@@ -137,6 +138,8 @@ pub enum Error {
     InvalidHintsUsed,
     InvalidFoundWords,
     TrailingText,
+    MissingColon,
+    InvalidPuzzleNumber,
 }
 
 impl fmt::Display for Error {
@@ -146,6 +149,8 @@ impl fmt::Display for Error {
             Error::InvalidHintsUsed => "invalid hints used",
             Error::InvalidFoundWords => "invalid found words",
             Error::TrailingText => "trailing text",
+            Error::MissingColon => "missing colon",
+            Error::InvalidPuzzleNumber => "invalid puzzle number",
         };
 
         write!(f, "{}", text)
@@ -198,6 +203,45 @@ impl FromStr for SaveState {
             found_words,
         })
     }
+}
+
+pub fn parse_multiple(s: &str) -> Result<HashMap<usize, SaveState>, Error> {
+    let mut puzzles = HashMap::new();
+
+    if s.is_empty() {
+        return Ok(puzzles);
+    }
+
+    for part in s.split(',') {
+        let Some((num_str, puzzle_str)) = part.split_once(':')
+        else {
+            return Err(Error::MissingColon);
+        };
+
+        let Ok(puzzle_num) = num_str.parse::<usize>()
+        else {
+            return Err(Error::InvalidPuzzleNumber);
+        };
+
+        puzzles.insert(puzzle_num, puzzle_str.parse::<SaveState>()?);
+    }
+
+    Ok(puzzles)
+}
+
+pub fn serialize_multiple<T: Write>(
+    out: &mut T,
+    puzzles: &HashMap<usize, SaveState>,
+) -> Result<(), fmt::Error> {
+    for (i, (&puzzle_num, puzzle)) in puzzles.iter().enumerate() {
+        if i != 0 {
+            write!(out, ",")?;
+        }
+
+        write!(out, "{}:{}", puzzle_num, puzzle)?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -307,5 +351,51 @@ mod test {
                 4 - i,
             );
         }
+    }
+
+    #[test]
+    fn test_parse_multiple() {
+        let puzzles = parse_multiple("").unwrap();
+        assert!(puzzles.is_empty());
+
+        let puzzles = parse_multiple("23:0.0.0").unwrap();
+        assert_eq!(puzzles.len(), 1);
+        assert_eq!(&puzzles[&23].to_string(), "0.0.0");
+
+        let puzzles = parse_multiple("23:0.0.0,5:1.1.1,6:2.0.2").unwrap();
+        assert_eq!(puzzles.len(), 3);
+        let mut keys = puzzles.keys().map(|&k| k).collect::<Vec<_>>();
+        keys.sort_unstable();
+        assert_eq!(&keys, &[5, 6, 23]);
+        assert_eq!(&puzzles[&6].to_string(), "2.0.2");
+        assert_eq!(&puzzles[&5].to_string(), "1.1.1");
+        assert_eq!(&puzzles[&23].to_string(), "0.0.0");
+    }
+
+    fn multiple_to_string(puzzles: HashMap<usize, SaveState>) -> String {
+        let mut result = String::new();
+        let _ = serialize_multiple(&mut result, &puzzles);
+        result
+    }
+
+    #[test]
+    fn multiple_there_and_back() {
+        assert_eq!(
+            "",
+            multiple_to_string(parse_multiple("").unwrap()),
+        );
+        assert_eq!(
+            "23:0.0.0",
+            multiple_to_string(parse_multiple("23:0.0.0").unwrap()),
+        );
+
+        let parsed = multiple_to_string(parse_multiple(
+            "23:0.0.0,5:1.1.1,6:2.0.2"
+        ).unwrap());
+
+        let mut v = parsed.split(',').collect::<Vec<_>>();
+        v.sort_unstable();
+
+        assert_eq!(&v, &["23:0.0.0", "5:1.1.1", "6:2.0.2"]);
     }
 }
