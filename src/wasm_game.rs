@@ -275,6 +275,7 @@ struct Wordroute {
     sort_word_lists: bool,
     show_some_letters: bool,
     hint_level: usize,
+    misses: u32,
 }
 
 impl Wordroute {
@@ -377,6 +378,7 @@ impl Wordroute {
             sort_word_lists: false,
             show_some_letters: false,
             hint_level: usize::MAX,
+            misses: 0,
         });
 
         wordroute.create_closures();
@@ -1024,6 +1026,7 @@ impl Wordroute {
             }
         } else {
             self.show_word_message("Not in list");
+            self.misses += 1;
         }
 
         self.clear_word();
