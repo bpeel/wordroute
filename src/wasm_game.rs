@@ -276,6 +276,7 @@ struct Wordroute {
     show_some_letters: bool,
     hint_level: usize,
     misses: u32,
+    hints_used: bool,
 }
 
 impl Wordroute {
@@ -379,6 +380,7 @@ impl Wordroute {
             show_some_letters: false,
             hint_level: usize::MAX,
             misses: 0,
+            hints_used: false,
         });
 
         wordroute.create_closures();
@@ -1268,6 +1270,11 @@ impl Wordroute {
         self.sort_word_lists = self.get_checkbox_value(SORT_HINT_CHECKBOX_ID);
         self.show_some_letters =
             self.get_checkbox_value(LETTERS_HINT_CHECKBOX_ID);
+
+        if self.sort_word_lists || self.show_some_letters {
+            self.hints_used = true;
+        }
+
         self.update_all_word_lists();
     }
 }
