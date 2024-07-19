@@ -22,11 +22,13 @@ use super::grid_math::Geometry;
 use super::word_finder;
 use super::directions;
 use super::puzzle::{Puzzle, WordType, N_HINT_LEVELS};
+use super::save_state::{self, SaveState};
 use std::fmt::Write;
 use js_sys::Reflect;
 use std::f32::consts::PI;
 use std::collections::{hash_map, HashMap};
 
+const SAVE_STATE_KEY: &'static str = "wordroute-save-states";
 const SVG_NAMESPACE: &'static str = "http://www.w3.org/2000/svg";
 const ROUTE_ID: &'static str = "route-line";
 const SORT_HINT_CHECKBOX_ID: &'static str = "sort-hint-checkbox";
@@ -238,6 +240,7 @@ struct Wordroute {
     pointercancel_closure: Option<Closure::<dyn Fn(JsValue)>>,
     keydown_closure: Option<Closure::<dyn Fn(JsValue)>>,
     hints_changed_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    visibility_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
     word_count: web_sys::HtmlElement,
     score_bar: web_sys::HtmlElement,
@@ -245,6 +248,7 @@ struct Wordroute {
     word_message: web_sys::HtmlElement,
     game_grid: web_sys::SvgElement,
     puzzle: Puzzle,
+    chosen_puzzle: usize,
     letters: Vec<Option<Letter>>,
     geometry: Geometry,
     word_finder: word_finder::Finder,
@@ -324,6 +328,7 @@ impl Wordroute {
             pointercancel_closure: None,
             keydown_closure: None,
             hints_changed_closure: None,
+            visibility_closure: None,
             game_contents,
             word_count,
             score_bar,
@@ -331,6 +336,7 @@ impl Wordroute {
             word_message,
             game_grid,
             puzzle,
+            chosen_puzzle,
             geometry,
             letters: Vec::new(),
             word_finder: word_finder::Finder::new(),
@@ -344,16 +350,54 @@ impl Wordroute {
             show_some_letters: false,
         });
 
+        wordroute.create_letters()?;
+
         wordroute.create_closures();
         wordroute.update_title(chosen_puzzle);
-        wordroute.create_letters()?;
         wordroute.create_word_lists()?;
+
+        if let Some(save_state) =
+            load_save_states(&wordroute.context).get(&chosen_puzzle)
+        {
+            wordroute.puzzle.load_save_state(&save_state);
+        }
 
         wordroute.flush_puzzle_changes();
 
         wordroute.show_game_contents();
 
         Ok(wordroute)
+    }
+
+    fn save_to_local_storage(&mut self) {
+        let Some(save_state) = self.puzzle.changed_save_state()
+        else {
+            return;
+        };
+
+        let Some(local_storage) = get_local_storage(&self.context)
+        else {
+            return;
+        };
+
+        let mut save_states = load_save_states_from_local_storage(
+            &local_storage
+        );
+
+        save_states.insert(self.chosen_puzzle, save_state);
+
+        let mut save_states_string = String::new();
+
+        save_state::serialize_multiple(
+            &mut save_states_string,
+            &save_states,
+        ).unwrap();
+
+        if let Err(_) =
+            local_storage.set_item(SAVE_STATE_KEY, &save_states_string)
+        {
+            console::log_1(&"Error saving state".into());
+        }
     }
 
     fn create_closures(&mut self) {
@@ -451,6 +495,20 @@ impl Wordroute {
         }
 
         self.hints_changed_closure = Some(hints_changed_closure);
+
+        let visibility_closure = Closure::<dyn Fn(JsValue)>::new(
+            move |_event: JsValue| {
+                let wordroute = unsafe { &mut *wordroute_pointer };
+                wordroute.save_to_local_storage();
+            }
+        );
+
+        let _ = self.context.document.add_event_listener_with_callback(
+            "visibilitychange",
+            visibility_closure.as_ref().unchecked_ref(),
+        );
+
+        self.visibility_closure = Some(visibility_closure);
     }
 
     fn create_svg_element(
@@ -1396,6 +1454,52 @@ fn build_puzzle_list(context: &Context, puzzles: Vec<PuzzleData>) {
     ).and_then(|ps| ps.dyn_into::<web_sys::HtmlElement>().ok()) {
         let _ = puzzle_selector.style().set_property("display", "block");
     };
+}
+
+fn load_save_states_from_local_storage(
+    local_storage: &web_sys::Storage,
+) -> HashMap<usize, SaveState> {
+    match local_storage.get_item(SAVE_STATE_KEY) {
+        Ok(Some(save_states)) => {
+            match save_state::parse_multiple(&save_states) {
+                Ok(save_states) => save_states,
+                Err(e) => {
+                    console::log_1(&format!(
+                        "Error parsing save states: {}",
+                        e,
+                    ).into());
+                    HashMap::new()
+                },
+            }
+        },
+        Ok(None) => HashMap::new(),
+        Err(_) => {
+            console::log_1(&"Error getting save states".into());
+            HashMap::new()
+        },
+    }
+}
+
+fn get_local_storage(context: &Context) -> Option<web_sys::Storage> {
+    match context.window.local_storage() {
+        Ok(Some(local_storage)) => Some(local_storage),
+        Ok(None) => {
+            console::log_1(&"Local storage is None".into());
+            None
+        },
+        Err(_) => {
+            console::log_1(&"Error getting local storage".into());
+            None
+        },
+    }
+}
+
+fn load_save_states(context: &Context) -> HashMap<usize, SaveState> {
+    if let Some(local_storage) = get_local_storage(context) {
+        load_save_states_from_local_storage(&local_storage)
+    } else {
+        HashMap::new()
+    }
 }
 
 #[wasm_bindgen]
