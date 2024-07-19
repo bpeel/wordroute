@@ -26,3 +26,5 @@ mod counts;
 mod directions;
 #[cfg(any(target_arch = "wasm32", test))]
 mod word_finder;
+#[cfg(any(target_arch = "wasm32", test))]
+mod save_state;
