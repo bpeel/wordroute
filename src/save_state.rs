@@ -99,6 +99,17 @@ impl<'a> Iterator for FoundWords<'a> {
             }
         }
     }
+
+    fn count(self) -> usize {
+        self.slice.get(self.pos + 1..)
+            .map(|slice| {
+                slice.into_iter().map(|bits| {
+                    bits.count_ones() as usize
+                }).sum()
+            })
+            .unwrap_or(0) +
+            self.bits.count_ones() as usize
+    }
 }
 
 impl fmt::Display for SaveState {
@@ -275,5 +286,26 @@ mod test {
             &"0.1.g".parse::<SaveState>().unwrap_err().to_string(),
             "invalid found words",
         );
+    }
+
+    #[test]
+    fn count() {
+        assert_eq!(
+            "0.0.800000001".parse::<SaveState>().unwrap().found_words().count(),
+            2,
+        );
+        assert_eq!(
+            "0.0.0".parse::<SaveState>().unwrap().found_words().count(),
+            0,
+        );
+
+        let save_state = "0.0.80000001000000011".parse::<SaveState>().unwrap();
+
+        for i in 0..=4 {
+            assert_eq!(
+                save_state.found_words().skip(i).count(),
+                4 - i,
+            );
+        }
     }
 }
