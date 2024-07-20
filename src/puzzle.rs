@@ -98,11 +98,7 @@ impl Puzzle {
         }).count();
 
         let total_n_letters = words.values().filter_map(|w| {
-            if w.word_type == WordType::Normal {
-                Some(w.length)
-            } else {
-                None
-            }
+            (w.word_type == WordType::Normal).then_some(w.length)
         }).sum::<usize>();
 
         let counts_dirty = u64::MAX >>
