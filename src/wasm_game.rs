@@ -21,6 +21,7 @@ use super::counts::{TileCounts, GridCounts};
 use super::grid_math::Geometry;
 use super::word_finder;
 use super::directions;
+use super::puzzle::{Puzzle, WordType, N_HINT_LEVELS};
 use std::fmt::Write;
 use js_sys::Reflect;
 use std::f32::consts::PI;
@@ -28,11 +29,9 @@ use std::collections::{hash_map, HashMap};
 
 const SVG_NAMESPACE: &'static str = "http://www.w3.org/2000/svg";
 const ROUTE_ID: &'static str = "route-line";
-const MIN_WORD_LENGTH: usize = 4;
 const SORT_HINT_CHECKBOX_ID: &'static str = "sort-hint-checkbox";
 const LETTERS_HINT_CHECKBOX_ID: &'static str = "letters-hint-checkbox";
 
-const N_HINT_LEVELS: usize = 4;
 const STARTS_HINT_LEVEL: usize = 1;
 const VISITS_HINT_LEVEL: usize = 2;
 const WORDS_HINT_LEVEL: usize = 3;
@@ -201,7 +200,7 @@ impl Loader {
         }
     }
 
-    fn start_game(&mut self, puzzles: Vec<Puzzle>) {
+    fn start_game(&mut self, puzzles: Vec<PuzzleData>) {
         let Loader { context, .. } = self.stop_floating();
 
         if let Some(puzzle_num) = get_chosen_puzzle(&context) {
@@ -225,22 +224,10 @@ struct Letter {
     visits: web_sys::SvgElement,
 }
 
-#[derive(PartialEq, Eq)]
-enum WordType {
-    Normal,
-    Bonus,
-}
-
-struct Word {
-    word_type: WordType,
-    length: usize,
-    found: bool,
-}
-
-struct Puzzle {
+struct PuzzleData {
     grid: Grid,
     counts: GridCounts,
-    words: HashMap<String, Word>,
+    words: Vec<(String, WordType)>,
 }
 
 struct Wordroute {
@@ -257,14 +244,8 @@ struct Wordroute {
     current_word: web_sys::HtmlElement,
     word_message: web_sys::HtmlElement,
     game_grid: web_sys::SvgElement,
+    puzzle: Puzzle,
     letters: Vec<Option<Letter>>,
-    grid: Grid,
-    counts: GridCounts,
-    words: HashMap<String, Word>,
-    n_words_found: usize,
-    total_n_words: usize,
-    n_letters_found: usize,
-    total_n_letters: usize,
     geometry: Geometry,
     word_finder: word_finder::Finder,
     word: String,
@@ -275,15 +256,12 @@ struct Wordroute {
     word_lists: HashMap<usize, web_sys::HtmlElement>,
     sort_word_lists: bool,
     show_some_letters: bool,
-    hint_level: usize,
-    misses: u32,
-    hints_used: bool,
 }
 
 impl Wordroute {
     fn new(
         context: Context,
-        puzzles: Vec<Puzzle>,
+        puzzles: Vec<PuzzleData>,
         chosen_puzzle: usize,
     ) -> Result<Box<Wordroute>, String> {
         let Some(game_contents) =
@@ -327,7 +305,7 @@ impl Wordroute {
             return Err("failed to get game grid".to_string());
         };
 
-        let Some(Puzzle { grid, counts, words }) = puzzles
+        let Some(PuzzleData { grid, counts, words }) = puzzles
             .into_iter()
             .nth(chosen_puzzle.wrapping_sub(1))
         else {
@@ -336,17 +314,7 @@ impl Wordroute {
 
         let geometry = Geometry::new(&grid, 100.0);
 
-        let total_n_words = words.values().filter(|w| {
-            w.word_type == WordType::Normal
-        }).count();
-
-        let total_n_letters = words.values().filter_map(|w| {
-            if w.word_type == WordType::Normal {
-                Some(w.length)
-            } else {
-                None
-            }
-        }).sum::<usize>();
+        let puzzle = Puzzle::new(grid, counts, words);
 
         let mut wordroute = Box::new(Wordroute {
             context,
@@ -362,13 +330,7 @@ impl Wordroute {
             current_word,
             word_message,
             game_grid,
-            grid,
-            counts,
-            words,
-            n_words_found: 0,
-            total_n_words,
-            n_letters_found: 0,
-            total_n_letters,
+            puzzle,
             geometry,
             letters: Vec::new(),
             word_finder: word_finder::Finder::new(),
@@ -380,19 +342,14 @@ impl Wordroute {
             word_lists: HashMap::new(),
             sort_word_lists: false,
             show_some_letters: false,
-            hint_level: usize::MAX,
-            misses: 0,
-            hints_used: false,
         });
 
         wordroute.create_closures();
         wordroute.update_title(chosen_puzzle);
         wordroute.create_letters()?;
         wordroute.create_word_lists()?;
-        wordroute.update_word_count();
-        wordroute.update_score_bar();
-        wordroute.update_all_word_lists();
-        wordroute.update_hint_level();
+
+        wordroute.flush_puzzle_changes();
 
         wordroute.show_game_contents();
 
@@ -509,7 +466,6 @@ impl Wordroute {
 
     fn create_letter_text(
         &self,
-        text: &str,
         y: f32,
         font_size: f32,
     ) -> Result<web_sys::SvgElement, String> {
@@ -518,8 +474,6 @@ impl Wordroute {
         let _ = elem.set_attribute("x", "0");
         let _ = elem.set_attribute("y", &y.to_string());
         let _ = elem.set_attribute("font-size", &font_size.to_string());
-
-        set_element_text(&elem, text);
 
         Ok(elem)
     }
@@ -532,11 +486,11 @@ impl Wordroute {
 
         let counts_font_size = self.geometry.radius * 0.3;
 
-        for (x, y) in (0..self.grid.height())
-            .map(|y| (0..self.grid.width()).map(move |x| (x, y)))
+        for (x, y) in (0..self.puzzle.height())
+            .map(|y| (0..self.puzzle.width()).map(move |x| (x, y)))
             .flatten()
         {
-            let letter = self.grid.at(x, y);
+            let letter = self.puzzle.grid().at(x, y);
 
             if letter == '.' {
                 self.letters.push(None);
@@ -559,18 +513,13 @@ impl Wordroute {
 
             let _ = g.append_with_node_1(&path);
 
-            let text = self.create_letter_text(
-                &self.grid.at(x, y).to_string(),
-                text_y_pos,
-                font_size,
-            )?;
+            let text = self.create_letter_text(text_y_pos, font_size)?;
+
+            set_element_text(&text, &self.puzzle.grid().at(x, y).to_string());
 
             let _ = g.append_with_node_1(&text);
 
-            let TileCounts { starts, visits } = self.counts.at(x, y);
-
             let starts = self.create_letter_text(
-                &starts.to_string(),
                 -self.geometry.radius * 0.6,
                 counts_font_size,
             )?;
@@ -578,7 +527,6 @@ impl Wordroute {
             let _ = g.append_with_node_1(&starts);
 
             let visits = self.create_letter_text(
-                &visits.to_string(),
                 self.geometry.radius * 0.8,
                 counts_font_size,
             )?;
@@ -609,12 +557,7 @@ impl Wordroute {
             return Err("failed to get word-lists element".to_string());
         };
 
-        let mut lengths = self.words.values()
-            .map(|word| word.length)
-            .collect::<Vec<_>>();
-        lengths.sort_unstable();
-
-        for length in lengths.into_iter() {
+        for length in self.puzzle.word_lists().into_iter() {
             if let hash_map::Entry::Vacant(entry) =
                 self.word_lists.entry(length)
             {
@@ -660,7 +603,7 @@ impl Wordroute {
         let mut missing_word_count = 0;
         let mut found_words = Vec::new();
 
-        for (key, word) in self.words.iter() {
+        for (key, word) in self.puzzle.words() {
             if word.length != length || word.word_type != WordType::Normal {
                 continue;
             }
@@ -821,7 +764,7 @@ impl Wordroute {
 
         if let Some(start) =
             self.word_finder.find(
-                &self.grid,
+                self.puzzle.grid(),
                 &self.word,
                 &mut self.try_route_buf,
             )
@@ -840,8 +783,7 @@ impl Wordroute {
         self.word.clear();
     }
 
-    fn show_word_message(&self, message: &str) {
-        set_element_text(&self.word_message, message);
+    fn animate_word_message(&self) {
         // Re-add the element to trigger the animation
         if let Some(parent) = self.word_message.parent_node() {
             self.word_message.remove();
@@ -849,18 +791,43 @@ impl Wordroute {
         }
     }
 
-    fn update_word_count(&self) {
-        set_element_text(
-            &self.word_count,
-            &format!("{} / {} words", self.n_words_found, self.total_n_words),
-        );
-    }
+    fn flush_puzzle_changes(&mut self) {
+        if let Some(n_words_found) = self.puzzle.changed_n_words_found() {
+            set_element_text(
+                &self.word_count,
+                &format!(
+                    "{} / {} words",
+                    n_words_found,
+                    self.puzzle.total_n_words(),
+                ),
+            );
+        }
 
-    fn update_score_bar(&self) {
-        let _ = self.score_bar.style().set_property(
-            "width",
-            &format!("{}%", self.n_letters_found * 100 / self.total_n_letters),
-        );
+        if let Some(n_letters_found) = self.puzzle.changed_n_letters_found() {
+            let _ = self.score_bar.style().set_property(
+                "width",
+                &format!(
+                    "{}%",
+                    n_letters_found * 100 / self.puzzle.total_n_letters()),
+            );
+        }
+
+        if let Some(hint_level) = self.puzzle.changed_hint_level() {
+            self.update_hint_level(hint_level);
+        }
+
+        for (x, y) in self.puzzle.changed_counts() {
+            self.update_counts_text(x, y);
+        }
+
+        if let Some(message) = self.puzzle.pending_word_message() {
+            set_element_text(&self.word_message, message);
+            self.animate_word_message();
+        }
+
+        for length in self.puzzle.changed_word_lists() {
+            self.update_word_list_for_length(length);
+        }
     }
 
     fn set_hint_style(&self, style: &str, value: bool) {
@@ -873,7 +840,7 @@ impl Wordroute {
         }
     }
 
-    fn update_next_level_marker(&self) {
+    fn update_next_level_marker(&self, hint_level: usize) {
         let Some(marker) = self.context.document.get_element_by_id(
             "next-level-marker"
         ).and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
@@ -883,7 +850,7 @@ impl Wordroute {
 
         let _ = marker.style().set_property(
             "display",
-            if self.hint_level + 1 < N_HINT_LEVELS {
+            if hint_level + 1 < N_HINT_LEVELS {
                 "block"
             } else {
                 "none"
@@ -891,7 +858,7 @@ impl Wordroute {
         );
 
         let mut marker_text = String::new();
-        let left_anchor = self.hint_level + 1 <= N_HINT_LEVELS / 2;
+        let left_anchor = hint_level + 1 <= N_HINT_LEVELS / 2;
 
         if left_anchor {
             marker_text.push_str("⇤ ");
@@ -906,7 +873,7 @@ impl Wordroute {
         if left_anchor {
             let _ = marker.style().set_property(
                 "left",
-                &format!("{}%", (self.hint_level + 1) * 100 / N_HINT_LEVELS),
+                &format!("{}%", (hint_level + 1) * 100 / N_HINT_LEVELS),
             );
             let _ = marker.style().remove_property("right");
         } else {
@@ -914,43 +881,35 @@ impl Wordroute {
                 "right",
                 &format!(
                     "{}%",
-                    100 - (self.hint_level + 1) * 100 / N_HINT_LEVELS
+                    100 - (hint_level + 1) * 100 / N_HINT_LEVELS
                 ),
             );
             let _ = marker.style().remove_property("left");
         }
     }
 
-    fn update_hint_level(&mut self) {
-        let new_hint_level = self.n_letters_found *
-            N_HINT_LEVELS /
-            self.total_n_letters;
+    fn update_hint_level(&mut self, hint_level: usize) {
+        self.set_hint_style(
+            "no-starts-hint",
+            hint_level < STARTS_HINT_LEVEL,
+        );
+        self.set_hint_style(
+            "no-visits-hint",
+            hint_level < VISITS_HINT_LEVEL,
+        );
+        self.set_hint_style(
+            "no-words-hint",
+            hint_level < WORDS_HINT_LEVEL,
+        );
 
-        if new_hint_level != self.hint_level {
-            self.hint_level = new_hint_level;
-
-            self.set_hint_style(
-                "no-starts-hint",
-                self.hint_level < STARTS_HINT_LEVEL,
-            );
-            self.set_hint_style(
-                "no-visits-hint",
-                self.hint_level < VISITS_HINT_LEVEL,
-            );
-            self.set_hint_style(
-                "no-words-hint",
-                self.hint_level < WORDS_HINT_LEVEL,
-            );
-
-            self.update_next_level_marker();
-        }
+        self.update_next_level_marker(hint_level);
     }
 
     fn update_counts_text(&self, x: u32, y: u32) {
-        let counts = self.counts.at(x, y);
+        let counts = self.puzzle.counts().at(x, y);
 
         if let Some(letter) = &self.letters[
-            ((y * self.grid.width()) + x) as usize
+            ((y * self.puzzle.width()) + x) as usize
         ] {
             set_element_text(&letter.starts, &counts.starts.to_string());
             set_element_text(&letter.visits, &counts.visits.to_string());
@@ -961,69 +920,11 @@ impl Wordroute {
         }
     }
 
-    fn remove_visits_for_word(&mut self) {
-        self.try_route_buf.clear();
-
-        if let Some((mut x, mut y)) = self.word_finder.find(
-            &self.grid,
-            &self.word,
-            &mut self.try_route_buf,
-        ) {
-            let start = self.counts.at_mut(x, y);
-            start.starts -= 1;
-            start.visits -= 1;
-
-            self.update_counts_text(x, y);
-
-            for &dir in self.try_route_buf.iter() {
-                (x, y) = directions::step(x, y, dir);
-
-                self.counts.at_mut(x, y).visits -= 1;
-
-                self.update_counts_text(x, y);
-            }
-        }
-    }
-
     fn send_word(&mut self) {
-        let length = self.word.chars().count();
-
-        if length < MIN_WORD_LENGTH {
-            if length > 0 {
-                self.show_word_message("Too short");
-            }
-        } else if let Some(word) = self.words.get_mut(&self.word) {
-            if std::mem::replace(&mut word.found, true) {
-                match word.word_type {
-                    WordType::Bonus => {
-                        self.show_word_message("Already found (bonus)");
-                    },
-                    WordType::Normal => {
-                        self.show_word_message("Already found");
-                    }
-                }
-            } else {
-                match word.word_type {
-                    WordType::Bonus => self.show_word_message("Bonus word!"),
-                    WordType::Normal => {
-                        self.show_word_message(&format!("+{} points!", length));
-                        self.remove_visits_for_word();
-                        self.n_words_found += 1;
-                        self.update_word_count();
-                        self.n_letters_found += length;
-                        self.update_score_bar();
-                        self.update_hint_level();
-                        self.update_word_list_for_length(length);
-                    }
-                }
-            }
-        } else {
-            self.show_word_message("Not in list");
-            self.misses += 1;
-        }
-
+        self.puzzle.score_word(&self.word);
         self.clear_word();
         let _ = self.update_word_route();
+        self.flush_puzzle_changes();
     }
 
     fn position_for_event(
@@ -1055,9 +956,9 @@ impl Wordroute {
 
         let (tile_x, tile_y) = self.geometry.reverse_coords(grid_x, grid_y);
 
-        if tile_x >= self.grid.width() ||
-            tile_y >= self.grid.height() ||
-            self.grid.at(tile_x as u32, tile_y as u32) == '.'
+        if tile_x >= self.puzzle.width() ||
+            tile_y >= self.puzzle.height() ||
+            self.puzzle.grid().at(tile_x as u32, tile_y as u32) == '.'
         {
             None
         } else {
@@ -1136,7 +1037,7 @@ impl Wordroute {
         self.route_start = Some(position);
         self.route_steps.clear();
         self.word.clear();
-        self.word.push(self.grid.at(position.0, position.1));
+        self.word.push(self.puzzle.grid().at(position.0, position.1));
         let _ = self.update_word();
     }
 
@@ -1155,7 +1056,8 @@ impl Wordroute {
 
         if self.position_for_event(&event).is_none() {
             if !self.route_steps.is_empty() {
-                self.show_word_message("Cancel");
+                set_element_text(&self.word_message, "Cancel");
+                self.animate_word_message();
             }
             self.clear_word();
             self.update_word();
@@ -1219,7 +1121,7 @@ impl Wordroute {
             }
 
             self.route_steps.push(dir);
-            self.word.push(self.grid.at(position.0, position.1));
+            self.word.push(self.puzzle.grid().at(position.0, position.1));
             self.pointer_tail = Some(position);
             let _ = self.update_word();
         }
@@ -1263,7 +1165,7 @@ impl Wordroute {
             self.get_checkbox_value(LETTERS_HINT_CHECKBOX_ID);
 
         if self.sort_word_lists || self.show_some_letters {
-            self.hints_used = true;
+            self.puzzle.use_hints();
         }
 
         self.update_all_word_lists();
@@ -1326,7 +1228,7 @@ fn parse_counts(data: &JsValue, grid: &Grid) -> Result<GridCounts, ()> {
     Ok(counts)
 }
 
-fn parse_words(data: &JsValue) -> Result<HashMap<String, Word>, ()> {
+fn parse_words(data: &JsValue) -> Result<Vec<(String, WordType)>, ()> {
     let Ok(words_object) = Reflect::get(&data, &"words".into())
         .map_err(|_| ())
         .and_then(|v| TryInto::<js_sys::Object>::try_into(v).map_err(|_| ()))
@@ -1337,7 +1239,7 @@ fn parse_words(data: &JsValue) -> Result<HashMap<String, Word>, ()> {
 
     let words_array = js_sys::Object::keys(&words_object);
 
-    let mut words = HashMap::new();
+    let mut words = Vec::new();
 
     for i in 0..words_array.length() {
         let word_value = words_array.get(i);
@@ -1356,8 +1258,6 @@ fn parse_words(data: &JsValue) -> Result<HashMap<String, Word>, ()> {
             return Err(());
         };
 
-        let length = word.chars().count();
-
         let word_type = if type_num == 0.0 {
             WordType::Normal
         } else if type_num == 1.0 {
@@ -1367,20 +1267,13 @@ fn parse_words(data: &JsValue) -> Result<HashMap<String, Word>, ()> {
             return Err(());
         };
 
-        words.insert(
-            word,
-            Word {
-                word_type,
-                found: false,
-                length,
-            },
-        );
+        words.push((word, word_type));
     }
 
     Ok(words)
 }
 
-fn parse_puzzle(data: JsValue) -> Result<Puzzle, ()> {
+fn parse_puzzle(data: JsValue) -> Result<PuzzleData, ()> {
     let Ok(grid_str) = Reflect::get(&data, &"grid".into())
         .map_err(|_| ())
         .and_then(|v| TryInto::<String>::try_into(v).map_err(|_| ()))
@@ -1400,14 +1293,14 @@ fn parse_puzzle(data: JsValue) -> Result<Puzzle, ()> {
     let counts = parse_counts(&data, &grid)?;
     let words = parse_words(&data)?;
 
-    Ok(Puzzle {
+    Ok(PuzzleData {
         grid,
         counts,
         words,
     })
 }
 
-fn parse_puzzles(data: JsValue) -> Result<Vec<Puzzle>, ()> {
+fn parse_puzzles(data: JsValue) -> Result<Vec<PuzzleData>, ()> {
     let Ok(puzzle_array) = TryInto::<js_sys::Array>::try_into(data)
     else {
         show_error("Error getting puzzle array");
@@ -1448,7 +1341,7 @@ fn get_chosen_puzzle(context: &Context) -> Option<usize> {
     puzzle_str.parse::<usize>().ok()
 }
 
-fn build_puzzle_list(context: &Context, puzzles: Vec<Puzzle>) {
+fn build_puzzle_list(context: &Context, puzzles: Vec<PuzzleData>) {
     let Some(puzzle_list) = context.document.get_element_by_id("puzzle-list")
     else {
         show_error("Error getting puzzle list");
@@ -1485,8 +1378,8 @@ fn build_puzzle_list(context: &Context, puzzles: Vec<Puzzle>) {
         let detail = context.document.create_text_node(
             &format!(
                 " – {} words",
-                puzzle.words.values()
-                    .filter(|word| word.word_type == WordType::Normal)
+                puzzle.words.iter()
+                    .filter(|&&(_, word_type)| word_type == WordType::Normal)
                     .count(),
             ),
         );

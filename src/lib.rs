@@ -28,3 +28,5 @@ mod directions;
 mod word_finder;
 #[cfg(any(target_arch = "wasm32", test))]
 mod save_state;
+#[cfg(any(target_arch = "wasm32", test))]
+mod puzzle;
