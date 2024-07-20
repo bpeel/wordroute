@@ -140,10 +140,54 @@ impl Puzzle {
         }
     }
 
+    pub fn load_save_state(&mut self, save_state: &SaveState) {
+        if self.misses < save_state.misses() {
+            self.misses = save_state.misses();
+        }
+
+        if save_state.hints_used() {
+            self.hints_used = true;
+        }
+
+        let mut sorted_words = self.words.iter_mut().collect::<Vec<_>>();
+        sorted_words.sort_unstable_by_key(|&(word, _)| word);
+
+        let mut words_to_score = Vec::new();
+
+        for word_num in save_state.found_words() {
+            if let Some((word, word_data)) = sorted_words.get_mut(word_num) {
+                if !word_data.found {
+                    word_data.found = true;
+                    if word_data.word_type == WordType::Normal {
+                        words_to_score.push(
+                            (word.to_string(), word_data.length)
+                        );
+                    }
+                }
+            }
+        }
+
+        for (word, length) in words_to_score.into_iter() {
+            self.score_normal_word(&word, length);
+        }
+
+        self.save_state_dirty = false;
+    }
+
     fn show_word_message(&mut self, message: &str) {
         self.pending_word_message.clear();
         self.pending_word_message.push_str(message);
         self.has_pending_word_message = true;
+    }
+
+    fn score_normal_word(&mut self, word: &str, length: usize) {
+        self.remove_visits_for_word(word);
+        self.n_words_found += 1;
+        self.n_words_found_dirty = true;
+        self.n_letters_found += length;
+        self.n_letters_found_dirty = true;
+        self.update_hint_level();
+        self.word_lists_dirty |= 1 << length;
     }
 
     pub fn score_word(&mut self, word: &str) {
@@ -170,13 +214,7 @@ impl Puzzle {
                     WordType::Bonus => self.show_word_message("Bonus word!"),
                     WordType::Normal => {
                         show_word_message!(self, "+{} points!", length);
-                        self.remove_visits_for_word(word);
-                        self.n_words_found += 1;
-                        self.n_words_found_dirty = true;
-                        self.n_letters_found += length;
-                        self.n_letters_found_dirty = true;
-                        self.update_hint_level();
-                        self.word_lists_dirty |= 1 << length;
+                        self.score_normal_word(word, length);
                     }
                 }
             }
@@ -588,5 +626,64 @@ mod test {
             "1.1.9",
         );
         assert!(puzzle.changed_save_state().is_none());
+    }
+
+    #[test]
+    fn load_save_state() {
+        let mut puzzle = four_line_puzzle();
+
+        assert_eq!(puzzle.changed_word_lists().count(), 2);
+        assert_eq!(puzzle.changed_counts().count(), 64);
+        assert_eq!(puzzle.changed_n_words_found().unwrap(), 0);
+        assert_eq!(puzzle.changed_n_letters_found().unwrap(), 0);
+        assert_eq!(puzzle.changed_hint_level().unwrap(), 0);
+
+        puzzle.load_save_state(&"5.1.2".parse::<SaveState>().unwrap());
+
+        assert!(puzzle.changed_save_state().is_none());
+
+        assert!(puzzle.hints_used);
+        assert_eq!(puzzle.misses, 5);
+
+        assert_eq!(
+            puzzle.changed_word_lists().collect::<Vec<_>>(),
+            &[6],
+        );
+
+        assert!(
+            puzzle.words.iter().find(|&(key, word)| {
+                key == "potato" && word.found
+            }).is_some()
+        );
+
+        assert_eq!(puzzle.changed_counts().count(), 6);
+
+        assert_eq!(puzzle.changed_n_words_found().unwrap(), 1);
+        assert_eq!(puzzle.changed_n_letters_found().unwrap(), 6);
+        assert_eq!(puzzle.changed_hint_level().unwrap(), 1);
+
+        puzzle.load_save_state(&"4.1.2".parse::<SaveState>().unwrap());
+
+        assert!(puzzle.hints_used);
+        assert_eq!(puzzle.misses, 5);
+        assert!(puzzle.changed_word_lists().next().is_none());
+        assert!(puzzle.changed_counts().next().is_none());
+        assert!(puzzle.changed_n_words_found().is_none());
+        assert!(puzzle.changed_n_letters_found().is_none());
+        assert!(puzzle.changed_hint_level().is_none());
+
+        puzzle.load_save_state(&"0.0.1".parse::<SaveState>().unwrap());
+        assert!(puzzle.hints_used);
+        assert_eq!(puzzle.misses, 5);
+        assert!(puzzle.changed_word_lists().next().is_none());
+        assert!(puzzle.changed_counts().next().is_none());
+        assert!(puzzle.changed_n_words_found().is_none());
+        assert!(puzzle.changed_n_letters_found().is_none());
+        assert!(puzzle.changed_hint_level().is_none());
+        assert!(
+            puzzle.words.iter().find(|&(key, word)| {
+                key == "paobtcadteofsgthoimjpkwlhminposp" && word.found
+            }).is_some()
+        );
     }
 }
