@@ -270,6 +270,7 @@ struct Wordroute {
     word: String,
     route_start: Option<(u32, u32)>,
     route_steps: Vec<u8>,
+    try_route_buf: Vec<u8>,
     pointer_tail: Option<(u32, u32)>,
     word_lists: HashMap<usize, web_sys::HtmlElement>,
     sort_word_lists: bool,
@@ -374,6 +375,7 @@ impl Wordroute {
             word: String::new(),
             route_start: None,
             route_steps: Vec::new(),
+            try_route_buf: Vec::new(),
             pointer_tail: None,
             word_lists: HashMap::new(),
             sort_word_lists: false,
@@ -815,26 +817,22 @@ impl Wordroute {
     }
 
     fn try_route_word(&mut self) -> bool {
-        // Hack to work around the borrow checker
-        let mut route_steps = std::mem::take(&mut self.route_steps);
+        self.try_route_buf.clear();
 
-        let result;
-
-        if let Some(word_finder::Route { start_x, start_y, steps }) =
-            self.word_finder.find(&self.grid, &self.word)
+        if let Some(start) =
+            self.word_finder.find(
+                &self.grid,
+                &self.word,
+                &mut self.try_route_buf,
+            )
         {
-            route_steps.clear();
-            route_steps.extend(steps.into_iter());
-            self.route_start = Some((start_x, start_y));
+            std::mem::swap(&mut self.route_steps, &mut self.try_route_buf);
+            self.route_start = Some(start);
 
-            result = true;
+            true
         } else {
-            result = false;
+            false
         }
-
-        self.route_steps = route_steps;
-
-        result
     }
 
     fn clear_word(&mut self) {
@@ -964,33 +962,26 @@ impl Wordroute {
     }
 
     fn remove_visits_for_word(&mut self) {
-        if let Some(route) = self.word_finder.find(
+        self.try_route_buf.clear();
+
+        if let Some((mut x, mut y)) = self.word_finder.find(
             &self.grid,
             &self.word,
+            &mut self.try_route_buf,
         ) {
-            let (mut x, mut y) = (route.start_x, route.start_y);
-
-            // Copy the route into a local array so that we don’t have
-            // to keep an immutable reference to self
-            let mut steps = std::mem::take(&mut self.route_steps);
-            steps.clear();
-            steps.extend_from_slice(route.steps);
-
             let start = self.counts.at_mut(x, y);
             start.starts -= 1;
             start.visits -= 1;
 
             self.update_counts_text(x, y);
 
-            for &dir in steps.iter() {
+            for &dir in self.try_route_buf.iter() {
                 (x, y) = directions::step(x, y, dir);
 
                 self.counts.at_mut(x, y).visits -= 1;
 
                 self.update_counts_text(x, y);
             }
-
-            self.route_steps = steps;
         }
     }
 

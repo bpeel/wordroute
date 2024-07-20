@@ -137,18 +137,19 @@ pub fn count_visits<I, T>(
 {
     let mut counts = GridCounts::new(grid.width(), grid.height());
     let mut finder = word_finder::Finder::new();
+    let mut steps = Vec::new();
 
     for word in words {
-        let route = finder.find(grid, word.as_ref()).unwrap();
+        steps.clear();
 
-        let start = counts.at_mut(route.start_x, route.start_y);
+        let (mut x, mut y) =
+            finder.find(grid, word.as_ref(), &mut steps).unwrap();
+
+        let start = counts.at_mut(x, y);
         start.starts += 1;
         start.visits += 1;
 
-        let mut x = route.start_x;
-        let mut y = route.start_y;
-
-        for &step in route.steps {
+        for &step in steps.iter() {
             (x, y) = directions::step(x, y, step);
             counts.at_mut(x, y).visits += 1;
         }

@@ -26,30 +26,23 @@ struct StackEntry {
 
 pub struct Finder {
     stack: Vec<StackEntry>,
-    route: Vec<u8>,
     visited: Vec<bool>,
-}
-
-pub struct Route<'a> {
-    pub start_x: u32,
-    pub start_y: u32,
-    pub steps: &'a [u8],
 }
 
 impl Finder {
     pub fn new() -> Finder {
         Finder {
             stack: Vec::new(),
-            route: Vec::new(),
             visited: Vec::new(),
         }
     }
 
-    fn find_from_position(
+    fn find_from_position<T: Extend<u8>>(
         &mut self,
         grid: &Grid,
         word: &str,
         start_x: u32, start_y: u32,
+        route: &mut T,
     ) -> bool {
         self.stack.clear();
         self.stack.push(StackEntry {
@@ -90,8 +83,7 @@ impl Finder {
                     entry.word_start + letter.unwrap().len_utf8();
 
                 if word.split_at(next_word_start).1.is_empty() {
-                    self.route.clear();
-                    self.route.extend(
+                    route.extend(
                         self.stack.iter().map(|entry| {
                             entry.next_direction as u8 - 1
                         })
@@ -122,15 +114,16 @@ impl Finder {
         false
     }
 
-    pub fn find(&mut self, grid: &Grid, word: &str) -> Option<Route> {
+    pub fn find<T: Extend<u8>>(
+        &mut self,
+        grid: &Grid,
+        word: &str,
+        route: &mut T,
+    ) -> Option<(u32, u32)> {
         for y in 0..grid.height() {
             for x in 0..grid.width() {
-                if self.find_from_position(grid, word, x, y) {
-                    return Some(Route {
-                        start_x: x,
-                        start_y: y,
-                        steps: &self.route,
-                    });
+                if self.find_from_position(grid, word, x, y, route) {
+                    return Some((x, y));
                 }
             }
         }
@@ -146,6 +139,7 @@ mod test {
     #[test]
     fn all_directions() {
         let mut finder = Finder::new();
+        let mut steps = Vec::new();
 
         let grid = Grid::new(
             "a b c\n\
@@ -153,57 +147,64 @@ mod test {
              g h i"
         ).unwrap();
 
-        let route = finder.find(&grid, "abc").unwrap();
-        assert_eq!(route.start_x, 0);
-        assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[3, 3]);
+        steps.clear();
+        let (x, y) = finder.find(&grid, "abc", &mut steps).unwrap();
+        assert_eq!(x, 0);
+        assert_eq!(y, 0);
+        assert_eq!(&steps, &[3, 3]);
 
-        let route = finder.find(&grid, "cba").unwrap();
-        assert_eq!(route.start_x, 2);
-        assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[2, 2]);
+        steps.clear();
+        let (x, y) = finder.find(&grid, "cba", &mut steps).unwrap();
+        assert_eq!(x, 2);
+        assert_eq!(y, 0);
+        assert_eq!(&steps, &[2, 2]);
 
-        let route = finder.find(&grid, "adg").unwrap();
-        assert_eq!(route.start_x, 0);
-        assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[5, 4]);
+        steps.clear();
+        let (x, y) = finder.find(&grid, "adg", &mut steps).unwrap();
+        assert_eq!(x, 0);
+        assert_eq!(y, 0);
+        assert_eq!(&steps, &[5, 4]);
 
-        let route = finder.find(&grid, "gda").unwrap();
-        assert_eq!(route.start_x, 0);
-        assert_eq!(route.start_y, 2);
-        assert_eq!(route.steps, &[1, 0]);
+        steps.clear();
+        let (x, y) = finder.find(&grid, "gda", &mut steps).unwrap();
+        assert_eq!(x, 0);
+        assert_eq!(y, 2);
+        assert_eq!(&steps, &[1, 0]);
     }
 
     #[test]
     fn backtrack() {
         let mut finder = Finder::new();
+        let mut steps = Vec::new();
 
         let grid = Grid::new(
             "b a c k t r a p\n\
               x x x x x x c k"
         ).unwrap();
 
-        let route = finder.find(&grid, "backtrap").unwrap();
-        assert_eq!(route.start_x, 0);
-        assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[3, 3, 3, 3, 3, 3, 3]);
+        let (x, y) = finder.find(&grid, "backtrap", &mut steps).unwrap();
+        assert_eq!(x, 0);
+        assert_eq!(y, 0);
+        assert_eq!(&steps, &[3, 3, 3, 3, 3, 3, 3]);
 
-        let route = finder.find(&grid, "backtrack").unwrap();
-        assert_eq!(route.start_x, 0);
-        assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[3, 3, 3, 3, 3, 3, 5, 3]);
+        steps.clear();
+        let (x, y) = finder.find(&grid, "backtrack", &mut steps).unwrap();
+        assert_eq!(x, 0);
+        assert_eq!(y, 0);
+        assert_eq!(&steps, &[3, 3, 3, 3, 3, 3, 5, 3]);
     }
 
     #[test]
     fn not_found() {
         let mut finder = Finder::new();
         let grid = Grid::new("haystack").unwrap();
-        assert!(finder.find(&grid, "needle").is_none());
+        assert!(finder.find(&grid, "needle", &mut Vec::new()).is_none());
     }
 
     #[test]
     fn no_reuse() {
         let mut finder = Finder::new();
+        let mut steps = Vec::new();
         let grid = Grid::new(
             "r e u\n\
               e s x"
@@ -212,11 +213,11 @@ mod test {
         // Make sure that the bottom ‘e’ was used for the last letter
         // instead of reusing the top ‘e’.
 
-        let route = finder.find(&grid, "reuse").unwrap();
-        assert_eq!(route.start_x, 0);
-        assert_eq!(route.start_y, 0);
-        assert_eq!(route.steps, &[3, 3, 4, 2]);
+        let (x, y) = finder.find(&grid, "reuse", &mut steps).unwrap();
+        assert_eq!(x, 0);
+        assert_eq!(y, 0);
+        assert_eq!(&steps, &[3, 3, 4, 2]);
 
-        assert!(finder.find(&grid, "reuser").is_none());
+        assert!(finder.find(&grid, "reuser", &mut steps).is_none());
     }
 }
