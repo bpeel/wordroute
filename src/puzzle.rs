@@ -18,6 +18,7 @@ use super::grid::Grid;
 use super::counts::GridCounts;
 use super::word_finder;
 use super::directions;
+use super::save_state::SaveState;
 use std::collections::{hash_map, HashMap, HashSet};
 use std::fmt::Write;
 
@@ -72,6 +73,7 @@ pub struct Puzzle {
     n_letters_found_dirty: bool,
     word_lists_dirty: u64,
     hint_level_dirty: bool,
+    save_state_dirty: bool,
 }
 
 impl Puzzle {
@@ -134,6 +136,7 @@ impl Puzzle {
             n_letters_found_dirty: true,
             word_lists_dirty,
             hint_level_dirty: true,
+            save_state_dirty: false,
         }
     }
 
@@ -161,6 +164,8 @@ impl Puzzle {
                     }
                 }
             } else {
+                self.save_state_dirty = true;
+
                 match word_data.word_type {
                     WordType::Bonus => self.show_word_message("Bonus word!"),
                     WordType::Normal => {
@@ -178,6 +183,7 @@ impl Puzzle {
         } else {
             self.show_word_message("Not in list");
             self.misses += 1;
+            self.save_state_dirty = true;
         }
     }
 
@@ -270,6 +276,27 @@ impl Puzzle {
         ChangedWordLists::new(std::mem::take(&mut self.word_lists_dirty))
     }
 
+    pub fn changed_save_state(&mut self) -> Option<SaveState> {
+        if self.save_state_dirty {
+            self.save_state_dirty = false;
+
+            let mut words = self.words.iter()
+                .map(|(key, word)| (key, word.found))
+                .collect::<Vec<_>>();
+            words.sort_unstable_by_key(|&(word, _)| word);
+
+            Some(SaveState::new(
+                self.misses,
+                self.hints_used,
+                words.into_iter().enumerate().filter_map(|(i, (_, found))| {
+                    found.then_some(i)
+                }),
+            ))
+        } else {
+            None
+        }
+    }
+
     pub fn total_n_words(&self) -> usize {
         self.total_n_words
     }
@@ -279,7 +306,10 @@ impl Puzzle {
     }
 
     pub fn use_hints(&mut self) {
-        self.hints_used = true;
+        if !self.hints_used {
+            self.hints_used = true;
+            self.save_state_dirty = true;
+        }
     }
 
     pub fn width(&self) -> u32 {
@@ -517,5 +547,46 @@ mod test {
             &[5, 6],
         );
         assert!(puzzle.changed_word_lists().next().is_none());
+    }
+
+    #[test]
+    fn save_state() {
+        let mut puzzle = four_line_puzzle();
+
+        assert!(puzzle.changed_save_state().is_none());
+
+        puzzle.score_word("paobtcadteofsgthoimjpkwlhminposp");
+        assert_eq!(
+            puzzle.changed_save_state().unwrap().to_string(),
+            "0.0.1",
+        );
+        assert!(puzzle.changed_save_state().is_none());
+
+        puzzle.score_word("paobtcadteofsgthoimjpkwlhminposp");
+        assert!(puzzle.changed_save_state().is_none());
+
+        puzzle.use_hints();
+        assert_eq!(
+            puzzle.changed_save_state().unwrap().to_string(),
+            "0.1.1",
+        );
+        assert!(puzzle.changed_save_state().is_none());
+
+        puzzle.use_hints();
+        assert!(puzzle.changed_save_state().is_none());
+
+        puzzle.score_word("missingword");
+        assert_eq!(
+            puzzle.changed_save_state().unwrap().to_string(),
+            "1.1.1",
+        );
+        assert!(puzzle.changed_save_state().is_none());
+
+        puzzle.score_word("whips");
+        assert_eq!(
+            puzzle.changed_save_state().unwrap().to_string(),
+            "1.1.9",
+        );
+        assert!(puzzle.changed_save_state().is_none());
     }
 }
