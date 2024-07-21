@@ -17,21 +17,30 @@
 use super::grid::Grid;
 use std::f32::consts::PI;
 
-// Return the width of the grid as the number of half hexagons. The
-// odd rows can take up an extra half hexagon, but sometimes this
-// isn’t needed if the end as a blank.
-fn half_grid_width(grid: &Grid) -> u32 {
+// Return the start and end of the grid in units of of half
+// hexagons. The odd rows can take up an extra half hexagon, but
+// sometimes this isn’t needed if the end as a blank.
+fn half_grid_size(grid: &Grid) -> (u32, u32) {
     (0..grid.height()).map(|y| {
-        let last = (0..grid.width()).rev().find(|&x| grid.at(x, y) != '.')
-            .unwrap_or(0);
-        let width = (last + 1) * 2;
+        let first = (0..grid.width()).find(|&x| grid.at(x, y) != '.')
+            .unwrap_or(grid.width() - 1) *
+            2;
+        let last = ((0..grid.width()).rev().find(|&x| grid.at(x, y) != '.')
+                    .unwrap_or(0) +
+                    1) *
+            2;
 
         if y & 1 == 0 {
-            width
+            (first, last)
         } else {
-            width + 1
+            (first + 1, last + 1)
         }
-    }).max().unwrap_or(0)
+    }).fold(
+        (u32::MAX, 0),
+        |(first_a, last_a), (first_b, last_b)| {
+            (first_a.min(first_b), last_a.max(last_b))
+        },
+    )
 }
 
 pub struct Geometry {
@@ -50,8 +59,9 @@ pub struct Geometry {
 
 impl Geometry {
     pub fn new(grid: &Grid, viewport_width: f32) -> Geometry {
+        let (first, last) = half_grid_size(grid);
         // Number of apothems required for the width
-        let width_in_apothems = half_grid_width(grid) as f32;
+        let width_in_apothems = (last - first) as f32;
         // The radius of a hexagon in units of apothems
         let radius_in_apothems = 1.0 / (PI / 6.0).cos();
         // Number of apothems required for the height
@@ -65,7 +75,7 @@ impl Geometry {
         Geometry {
             width: viewport_width,
             height: apothem * height_in_apothems,
-            top_x: apothem,
+            top_x: apothem - first as f32 * apothem,
             top_y: radius,
             radius,
             step_x: apothem * 2.0,
@@ -149,32 +159,40 @@ mod test {
     #[test]
     fn test_half_grid_width() {
         assert_eq!(
-            half_grid_width(&Grid::new(
+            half_grid_size(&Grid::new(
                 "a a a\n\
                   a a a"
             ).unwrap()),
-            7,
+            (0, 7),
         );
         assert_eq!(
-            half_grid_width(&Grid::new(
+            half_grid_size(&Grid::new(
                 "a a a\n\
                   a a ."
             ).unwrap()),
-            6,
+            (0, 6),
         );
         assert_eq!(
-            half_grid_width(&Grid::new(
+            half_grid_size(&Grid::new(
                 "a a .\n\
                   a a ."
             ).unwrap()),
-            5,
+            (0, 5),
         );
         assert_eq!(
-            half_grid_width(&Grid::new(
+            half_grid_size(&Grid::new(
                 "a a .\n\
                   a a a"
             ).unwrap()),
-            7,
+            (0, 7),
+        );
+        assert_eq!(
+            half_grid_size(&Grid::new(
+                ". a a\n\
+                  a a a\n\
+                 . a a"
+            ).unwrap()),
+            (1, 7),
         );
     }
 
@@ -188,6 +206,12 @@ mod test {
         assert!((geometry.radius - (4.0 / 3.0f32.sqrt())).abs() < 0.01);
         assert!((geometry.step_y - (geometry.radius * 1.5)).abs() < 0.01);
         assert!((geometry.top_y - geometry.radius).abs() < 0.01);
+
+        let grid = Grid::new(".aa\naaa").unwrap();
+        let geometry = Geometry::new(&grid, 21.0);
+
+        assert!(geometry.top_x.abs() < 0.01);
+        assert!((geometry.step_x - 7.0).abs() < 0.01);
     }
 
     #[test]
