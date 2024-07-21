@@ -241,6 +241,8 @@ struct Wordroute {
     keydown_closure: Option<Closure::<dyn Fn(JsValue)>>,
     hints_changed_closure: Option<Closure::<dyn Fn(JsValue)>>,
     visibility_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    close_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    help_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
     word_count: web_sys::HtmlElement,
     score_bar: web_sys::HtmlElement,
@@ -329,6 +331,8 @@ impl Wordroute {
             keydown_closure: None,
             hints_changed_closure: None,
             visibility_closure: None,
+            close_closure: None,
+            help_closure: None,
             game_contents,
             word_count,
             score_bar,
@@ -353,18 +357,25 @@ impl Wordroute {
         wordroute.create_letters()?;
 
         wordroute.create_closures();
+        wordroute.set_up_close_button();
+        wordroute.set_up_help_button();
         wordroute.update_title(chosen_puzzle);
         wordroute.create_word_lists()?;
 
-        if let Some(save_state) =
-            load_save_states(&wordroute.context).get(&chosen_puzzle)
-        {
+        let save_states = load_save_states(&wordroute.context);
+
+        if let Some(save_state) = save_states.get(&chosen_puzzle) {
             wordroute.puzzle.load_save_state(&save_state);
         }
 
         wordroute.flush_puzzle_changes();
 
+        wordroute.remove_loading_class();
         wordroute.show_game_contents();
+
+        if save_states.is_empty() {
+            wordroute.set_instructions_visibility(true);
+        }
 
         Ok(wordroute)
     }
@@ -534,6 +545,58 @@ impl Wordroute {
         let _ = elem.set_attribute("font-size", &font_size.to_string());
 
         Ok(elem)
+    }
+
+    fn set_up_close_button(&mut self) {
+        let wordroute_pointer = self as *mut Wordroute;
+
+        let close_closure = Closure::<dyn Fn(JsValue)>::new(
+            move |_event: JsValue| {
+                let wordroute = unsafe { &mut *wordroute_pointer };
+                wordroute.set_instructions_visibility(false);
+            }
+        );
+
+        for id in ["close-instructions", "close-instructions-cross"] {
+            let Some(close_button) =
+                self.context.document.get_element_by_id(id)
+                .and_then(|c| c.dyn_into::<web_sys::EventTarget>().ok())
+            else {
+                continue;
+            };
+
+            let _ = close_button.add_event_listener_with_callback(
+                "click",
+                close_closure.as_ref().unchecked_ref(),
+            );
+        }
+
+        self.close_closure = Some(close_closure);
+    }
+
+    fn set_up_help_button(&mut self) {
+        let wordroute_pointer = self as *mut Wordroute;
+
+        let help_closure = Closure::<dyn Fn(JsValue)>::new(
+            move |_event: JsValue| {
+                let wordroute = unsafe { &mut *wordroute_pointer };
+                wordroute.set_instructions_visibility(true);
+            }
+        );
+
+        let Some(help_button) =
+            self.context.document.get_element_by_id("help-button")
+            .and_then(|c| c.dyn_into::<web_sys::EventTarget>().ok())
+        else {
+            return;
+        };
+
+        let _ = help_button.add_event_listener_with_callback(
+            "click",
+            help_closure.as_ref().unchecked_ref(),
+        );
+
+        self.help_closure = Some(help_closure);
     }
 
     fn create_letters(&mut self) -> Result<(), String> {
@@ -846,6 +909,37 @@ impl Wordroute {
         if let Some(parent) = self.word_message.parent_node() {
             self.word_message.remove();
             let _ = parent.append_child(&self.word_message);
+        }
+    }
+
+    fn set_instructions_visibility(&mut self, visibility: bool) {
+        if let Some(instructions) =
+            self.context.document.get_element_by_id("instructions-overlay")
+            .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
+        {
+            let _ = instructions.style().set_property(
+                "display",
+                if visibility { "block" } else { "none" },
+            );
+        }
+
+        if let Some(content) =
+            self.context.document.get_element_by_id("content")
+            .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
+        {
+            let _ = content.style().set_property(
+                "display",
+                if visibility { "none" } else { "block" },
+            );
+        }
+    }
+
+    fn remove_loading_class(&self) {
+        if let Some(content) =
+            self.context.document.get_element_by_id("content")
+            .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
+        {
+            let _ = content.class_list().remove_1("loading");
         }
     }
 

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     version="1.1"
+     viewBox="0 0 100 96.22504">
+  <g transform="translate(33.333332, 19.245008)">
+    <path fill="#eee" stroke="#aaa" stroke-width="0.02em" d="M 0 -19.245008 L 16.666668 -9.622503 L 16.666666 9.622505 L -0.0000016824521 19.245008 L -16.666668 9.622502 L -16.666662 -9.622511 z" />
+    <text text-anchor="middle" x="0" y="4.811252" font-size="19.245008">𐑐</text>
+  </g>
+  <g transform="translate(66.666664, 19.245008)">
+    <path fill="#eee" stroke="#aaa" stroke-width="0.02em" d="M 0 -19.245008 L 16.666668 -9.622503 L 16.666666 9.622505 L -0.0000016824521 19.245008 L -16.666668 9.622502 L -16.666662 -9.622511 z" />
+    <text text-anchor="middle" x="0" y="4.811252" font-size="19.245008">𐑳</text>
+  </g>
+  <g transform="translate(16.666666, 48.11252)">
+    <path fill="#eee" stroke="#aaa" stroke-width="0.02em" d="M 0 -19.245008 L 16.666668 -9.622503 L 16.666666 9.622505 L -0.0000016824521 19.245008 L -16.666668 9.622502 L -16.666662 -9.622511 z" />
+    <text text-anchor="middle" x="0" y="4.811252" font-size="19.245008">𐑼</text>
+  </g>
+  <g transform="translate(50, 48.11252)">
+    <path fill="#eee" stroke="#aaa" stroke-width="0.02em" d="M 0 -19.245008 L 16.666668 -9.622503 L 16.666666 9.622505 L -0.0000016824521 19.245008 L -16.666668 9.622502 L -16.666662 -9.622511 z" />
+    <text text-anchor="middle" x="0" y="4.811252" font-size="19.245008">𐑟</text>
+  </g>
+  <g transform="translate(83.33333, 48.11252)">
+    <path fill="#eee" stroke="#aaa" stroke-width="0.02em" d="M 0 -19.245008 L 16.666668 -9.622503 L 16.666666 9.622505 L -0.0000016824521 19.245008 L -16.666668 9.622502 L -16.666662 -9.622511 z" />
+    <text text-anchor="middle" x="0" y="4.811252" font-size="19.245008">𐑱</text>
+  </g>
+  <g transform="translate(33.333332, 76.980034)">
+    <path fill="#eee" stroke="#aaa" stroke-width="0.02em" d="M 0 -19.245008 L 16.666668 -9.622503 L 16.666666 9.622505 L -0.0000016824521 19.245008 L -16.666668 9.622502 L -16.666662 -9.622511 z" />
+    <text text-anchor="middle" x="0" y="4.811252" font-size="19.245008">𐑩</text>
+  </g>
+  <g transform="translate(66.666664, 76.980034)">
+    <path fill="#eee" stroke="#aaa" stroke-width="0.02em" d="M 0 -19.245008 L 16.666668 -9.622503 L 16.666666 9.622505 L -0.0000016824521 19.245008 L -16.666668 9.622502 L -16.666662 -9.622511 z" />
+    <text text-anchor="middle" x="0" y="4.811252" font-size="19.245008">𐑤</text>
+  </g>
+  <g id="route-line">
+    <circle r="7.6980033" cx="33.333332" cy="19.245008" fill="#f00" opacity="0.7" />
+    <path d="M 33.333332,19.245008L 66.666664,19.245008L 50,48.11252L 33.333332,76.980034L 66.666664,76.980034" stroke-width="5.773503" fill="none" stroke="#f00" opacity="0.7" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+</svg>

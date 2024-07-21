@@ -29,9 +29,30 @@
     <script type="module" src="wordroute.js"></script>
   </head>
   <body>
-    <div id="content">
+    <div id="content" class="loading">
       <div class="title-bar">
+        <div class="title-space"></div>
         <h1 id="title">WordRoute</h1>
+        <svg id="help-button" viewBox="0 0 35.967396 35.9674">
+          <path fill="black"
+                d="M 17.984,0.649 c -9.557,0 -17.334,7.777 -17.334,17.334
+                   0,9.557 7.777,17.334 17.334,17.334 9.557,0 17.334,-7.777
+                   17.334,-17.334 0,-9.557 -7.777,-17.334 -17.334,-17.334 z
+                   m 0,2.701 c 8.098,0 14.633,6.535 14.633,14.633 0,8.098
+                   -6.535,14.635 -14.633,14.635 -8.098,0 -14.635,-6.537
+                   -14.635,-14.635 0,-8.098 6.537,-14.633 14.635,-14.633
+                   z m -2.389,22.673 h 3.138 v 3.926 h -3.138 z m 3.045,-2.272
+                   h -2.952 v -2.380 q 0,-1.561 0.433,-2.566 0.433,-1.005
+                   1.824,-2.334 l 1.391,-1.376 q 0.881,-0.819 1.267,-1.546
+                   0.402,-0.726 0.402,-1.484 0,-1.376 -1.020,-2.226
+                   -1.005,-0.850 -2.674,-0.850 -1.221,0 -2.612,0.541
+                   -1.376,0.541 -2.875,1.577 v -2.906 q 1.453,-0.881
+                   2.937,-1.314 1.499,-0.433 3.091,-0.433 2.844,0
+                   4.560,1.499 1.731,1.499 1.731,3.957 0,1.175 -0.556,2.241
+                   -0.556,1.051 -1.947,2.380 l -1.360,1.329 q -0.726,0.726
+                   -1.036,1.144 -0.294,0.402 -0.417,0.788 -0.093,0.325
+                   -0.139,0.788 -0.046,0.464 -0.046,1.267 z" />
+        </svg>
       </div>
       <p id="message" style="display: block">Loading…</p>
       <div id="game-contents" style="display: none">
@@ -61,6 +82,51 @@
         <p>Choose a puzzle to begin playing.</p>
         <ul id="puzzle-list">
         </ul>
+      </div>
+    </div>
+    <div id="instructions-overlay" style="display: none">
+      <div id="instructions">
+        <div class="title-bar">
+          <div class="title-space"></div>
+          <h1 id="title">How to play</h1>
+          <svg id="close-instructions-cross" viewBox="0 0 35.967396 35.9674">
+            <path stroke="black" stroke-width="5"
+                  d="M 32.670,3.245 l -28.990,29.793
+                     m 0,-29.793 28.990,29.793" />
+          </svg>
+        </div>
+        <p>
+          WordRoute is a word game using
+          the <a href="https://www.shavian.info/">Shavian
+          alphabet</a>. Try to find all the words in the grid that are
+          at least four letters long.
+        </p>
+        <img src="example-word.svg" alt="Example of a word in the grid">
+        <p>
+          There are three levels of hints that will help you find all
+          the words. These will be unlocked as you progress through
+          the puzzle. The first level tells you how many words start
+          with each letter and the second one tells you how many words
+          contain the letter.
+        </p>
+        <img src="counts-example.svg"
+             alt="Explanation of the numbers on the tiles">
+        <p>
+          The last hint level gives you two optional changes to the list of words:
+        </p>
+        <ul>
+          <li><b>Sort words alphabetically:</b><br> The missing words
+            are inserted in sorted order between the words that have
+            already been found. This can give you an idea of what
+            letters the missing words might contain. For the Shavian
+            alphabet the order is:
+            𐑐𐑑𐑒𐑓𐑔𐑕𐑖𐑗𐑘𐑙𐑚𐑛𐑜𐑝𐑞𐑟𐑠𐑡𐑢𐑣𐑤𐑥𐑦𐑧𐑨𐑩𐑪𐑫𐑬𐑭𐑮𐑯𐑰𐑱𐑲𐑳𐑴𐑵𐑶𐑷𐑸𐑹𐑺𐑻𐑼𐑽𐑾𐑿
+            <li><b>Show some letters:</b><br> The missing words in the
+            list will have a hint about what letters are at the start
+            or the end.
+        </ul>
+        <p>Good luck!</p>
+        <button id="close-instructions">Close</button>
       </div>
     </div>
   </body>
