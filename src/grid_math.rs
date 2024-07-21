@@ -187,7 +187,7 @@ mod test {
         assert!((geometry.step_x - 4.0).abs() < 0.01);
         assert!((geometry.radius - (4.0 / 3.0f32.sqrt())).abs() < 0.01);
         assert!((geometry.step_y - (geometry.radius * 1.5)).abs() < 0.01);
-        assert!((geometry.top_y - (8.0 - geometry.step_y / 2.0)) < 0.01);
+        assert!((geometry.top_y - geometry.radius).abs() < 0.01);
     }
 
     #[test]
