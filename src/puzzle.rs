@@ -380,6 +380,48 @@ impl Puzzle {
     pub fn words(&self) -> Words {
         Words::new(self.words.iter())
     }
+
+    pub fn share_text(&self, puzzle_num: usize) -> String {
+        let mut text = format!(
+            "I played WordRoute #{}\n\
+             {}/{} words",
+            puzzle_num,
+            self.n_words_found,
+            self.total_n_words,
+        );
+
+        let n_bonus_words = self.words.values().filter(|word| {
+            word.word_type == WordType::Bonus && word.found
+        }).count();
+
+        if n_bonus_words > 0 {
+            if n_bonus_words == 1 {
+                text.push_str(" (+1 bonus word)");
+            } else {
+                write!(&mut text, " (+{} bonus words)", n_bonus_words).unwrap();
+            }
+        }
+
+        if self.n_words_found >= self.total_n_words {
+            if !self.hints_used {
+                text.push_str("\n😎 No hints used");
+            }
+            if self.misses == 0 {
+                text.push_str("\n🎯 Perfect accuracy");
+            } else {
+                let total_guesses = self.misses as usize + self.total_n_words;
+                let accuracy = ((self.total_n_words * 100 +
+                                 total_guesses / 2) /
+                                total_guesses)
+                    .min(99);
+                if accuracy >= 75 {
+                    write!(&mut text, "\n🎯 {}% accuracy", accuracy).unwrap();
+                }
+            }
+        }
+
+        text
+    }
 }
 
 pub struct ChangedCounts {
@@ -463,6 +505,24 @@ impl<'a> Words<'a> {
 mod test {
     use super::*;
 
+    fn make_counts<I: IntoIterator<Item = (u8, u8)>>(
+        grid: &Grid,
+        counts_data: I,
+    ) -> GridCounts {
+        let mut counts = GridCounts::new(grid.width(), grid.height());
+
+        for (i, (starts, visits)) in counts_data.into_iter().enumerate() {
+            let counts = counts.at_mut(
+                i as u32 % grid.width(),
+                i as u32 / grid.width(),
+            );
+            counts.starts = starts;
+            counts.visits = visits;
+        }
+
+        counts
+    }
+
     fn four_line_puzzle() -> Puzzle {
         let grid = Grid::new(
             "potatostompwhips\n\
@@ -482,13 +542,7 @@ mod test {
             (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1)
         ];
 
-        let mut counts = GridCounts::new(grid.width(), grid.height());
-
-        for (i, (starts, visits)) in counts_data.into_iter().enumerate() {
-            let counts = counts.at_mut(i as u32 % 16, i as u32 / 16);
-            counts.starts = starts;
-            counts.visits = visits;
-        }
+        let counts = make_counts(&grid, counts_data);
 
         Puzzle::new(
             grid,
@@ -684,6 +738,109 @@ mod test {
             puzzle.words.iter().find(|&(key, word)| {
                 key == "paobtcadteofsgthoimjpkwlhminposp" && word.found
             }).is_some()
+        );
+    }
+
+    fn wordy_puzzle() -> Puzzle {
+        let grid = Grid::new(".or\nabe\n.ts").unwrap();
+
+        let counts_data = [
+            (0, 0), (1, 8), (3, 5),
+            (0, 4), (6, 9), (0, 5),
+            (0, 0), (0, 5), (0, 7)
+        ];
+
+        let counts = make_counts(&grid, counts_data);
+
+        Puzzle::new(
+            grid,
+            counts,
+            vec![
+                ("bats".to_string(), WordType::Normal),
+                ("best".to_string(), WordType::Normal),
+                ("boat".to_string(), WordType::Normal),
+                ("boats".to_string(), WordType::Normal),
+                ("bore".to_string(), WordType::Normal),
+                ("bores".to_string(), WordType::Normal),
+                ("brest".to_string(), WordType::Bonus),
+                ("estab".to_string(), WordType::Bonus),
+                ("oats".to_string(), WordType::Normal),
+                ("robe".to_string(), WordType::Normal),
+                ("robes".to_string(), WordType::Normal),
+                ("robs".to_string(), WordType::Normal),
+                ("sebat".to_string(), WordType::Bonus),
+            ]
+        )
+    }
+
+    #[test]
+    fn share_text() {
+        let mut puzzle = wordy_puzzle();
+
+        assert_eq!(
+            puzzle.share_text(12),
+            "I played WordRoute #12\n\
+             0/10 words",
+        );
+
+        puzzle.score_word("bats");
+        puzzle.score_word("best");
+        puzzle.score_word("brest");
+
+        assert_eq!(
+            puzzle.share_text(12),
+            "I played WordRoute #12\n\
+             2/10 words (+1 bonus word)",
+        );
+
+        puzzle.score_word("estab");
+
+        assert_eq!(
+            puzzle.share_text(12),
+            "I played WordRoute #12\n\
+             2/10 words (+2 bonus words)",
+        );
+
+        for word in [
+            "boat", "boats", "bore", "bores", "oats", "robe", "robes", "robs",
+        ].iter() {
+            puzzle.score_word(word);
+        }
+
+        assert_eq!(
+            puzzle.share_text(6),
+            "I played WordRoute #6\n\
+             10/10 words (+2 bonus words)\n\
+             😎 No hints used\n\
+             🎯 Perfect accuracy",
+        );
+
+        puzzle.use_hints();
+
+        assert_eq!(
+            puzzle.share_text(42),
+            "I played WordRoute #42\n\
+             10/10 words (+2 bonus words)\n\
+             🎯 Perfect accuracy",
+        );
+
+        for _ in 0..3 {
+            puzzle.score_word("notaword");
+        }
+
+        assert_eq!(
+            puzzle.share_text(42),
+            "I played WordRoute #42\n\
+             10/10 words (+2 bonus words)\n\
+             🎯 77% accuracy",
+        );
+
+        puzzle.score_word("stillnotaword");
+
+        assert_eq!(
+            puzzle.share_text(42),
+            "I played WordRoute #42\n\
+             10/10 words (+2 bonus words)",
         );
     }
 }
