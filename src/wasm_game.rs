@@ -17,7 +17,6 @@
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 use super::grid::Grid;
-use super::counts::{TileCounts, GridCounts};
 use super::grid_math::Geometry;
 use super::word_finder;
 use super::directions;
@@ -238,7 +237,6 @@ struct Letter {
 
 struct PuzzleData {
     grid: Grid,
-    counts: GridCounts,
     words: Vec<(String, WordType)>,
 }
 
@@ -324,7 +322,7 @@ impl Wordroute {
             return Err("failed to get game grid".to_string());
         };
 
-        let Some(PuzzleData { grid, counts, words }) = puzzles
+        let Some(PuzzleData { grid, words }) = puzzles
             .into_iter()
             .nth(chosen_puzzle.wrapping_sub(1))
         else {
@@ -1494,42 +1492,6 @@ fn hexagon_path(radius: f32) -> String {
     result
 }
 
-fn get_count_value(array: &js_sys::Array, key: u32) -> Result<u8, ()> {
-    array.get(key).as_f64().ok_or_else(|| {
-        show_error("Error getting count value");
-        ()
-    }).map(|v| v as u8)
-}
-
-fn parse_counts(data: &JsValue, grid: &Grid) -> Result<GridCounts, ()> {
-    let Ok(counts_array) = Reflect::get(&data, &"counts".into())
-        .map_err(|_| ())
-        .and_then(|v| TryInto::<js_sys::Array>::try_into(v).map_err(|_| ()))
-    else {
-        show_error("Error getting puzzle counts");
-        return Err(());
-    };
-
-    let mut counts = GridCounts::new(grid.width(), grid.height());
-
-    for y in 0..grid.height() {
-        for x in 0..grid.width() {
-            let starts = get_count_value(
-                &counts_array,
-                (y * grid.width() + x) * 2,
-            )?;
-            let visits = get_count_value(
-                &counts_array,
-                (y * grid.width() + x) * 2 + 1,
-            )?;
-
-            *counts.at_mut(x, y) = TileCounts { starts, visits };
-        }
-    }
-
-    Ok(counts)
-}
-
 fn parse_words(data: &JsValue) -> Result<Vec<(String, WordType)>, ()> {
     let Ok(words_object) = Reflect::get(&data, &"words".into())
         .map_err(|_| ())
@@ -1594,12 +1556,10 @@ fn parse_puzzle(data: JsValue) -> Result<PuzzleData, ()> {
         },
     };
 
-    let counts = parse_counts(&data, &grid)?;
     let words = parse_words(&data)?;
 
     Ok(PuzzleData {
         grid,
-        counts,
         words,
     })
 }
