@@ -27,6 +27,13 @@ use std::{fs, process::ExitCode, ffi::OsString};
 use clap::Parser;
 use std::collections::HashSet;
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum WordType {
+    Normal,
+    Bonus,
+    Excluded,
+}
+
 #[derive(Parser)]
 #[command(name = "Build")]
 struct Cli {
@@ -34,6 +41,8 @@ struct Cli {
     dictionary: OsString,
     #[arg(short, long, value_name = "FILE")]
     bonus_words: Vec<OsString>,
+    #[arg(short = 'x', long, value_name = "FILE")]
+    excluded_words: Vec<OsString>,
     #[arg(short, long, value_name = "LENGTH", default_value_t = 4)]
     minimum_length: usize,
     #[arg(short, long)]
@@ -68,18 +77,23 @@ fn print_grid(grid: &grid::Grid, counts: &counts::GridCounts) {
 fn print_text(
     grid: &grid::Grid,
     counts: &counts::GridCounts,
-    words: Vec<String>,
-    bonus_words: &HashSet<String>,
+    words: Vec<(String, WordType)>,
 ) {
     print_grid(&grid, &counts);
 
     println!();
 
-    for word in words.into_iter() {
+    for (word, word_type) in words.into_iter() {
         print!("{}", &word);
 
-        if bonus_words.contains(&word) {
-            print!(" (bonus)");
+        match word_type {
+            WordType::Normal => (),
+            WordType::Bonus => {
+                print!(" (bonus)");
+            },
+            WordType::Excluded => {
+                print!(" (excluded)");
+            },
         }
 
         println!();
@@ -88,8 +102,7 @@ fn print_text(
 
 fn print_json(
     grid: &grid::Grid,
-    words: Vec<String>,
-    bonus_words: &HashSet<String>,
+    words: Vec<(String, WordType)>,
 ) {
     print!("{{\"grid\":\"");
 
@@ -104,15 +117,15 @@ fn print_json(
 
     print!("\",\"words\":{{");
 
-    for (i, word) in words.into_iter().enumerate() {
+    for (i, (word, word_type)) in words.into_iter().enumerate() {
         if i != 0 {
             print!(",");
         }
 
-        let word_type = if bonus_words.contains(&word) {
-            1
-        } else {
-            0
+        let word_type = match word_type {
+            WordType::Normal => 0,
+            WordType::Bonus => 1,
+            WordType::Excluded => 2,
         };
 
         print!("\"{}\":{}", word, word_type);
@@ -181,6 +194,14 @@ fn main() -> ExitCode {
         }
     };
 
+    let excluded_words = match read_word_list(cli.excluded_words.iter()) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("{}", e);
+            return ExitCode::FAILURE;
+        }
+    };
+
     let dictionary = dictionary::Dictionary::new(dictionary.into_boxed_slice());
 
     let grid_string = match std::io::read_to_string(std::io::stdin()) {
@@ -200,17 +221,32 @@ fn main() -> ExitCode {
     };
 
     let words = build::search_words(&grid, &dictionary, cli.minimum_length);
-    let mut words = words.into_iter().collect::<Vec<String>>();
-    words.sort();
+    let mut words = words.into_iter()
+        .map(|word| {
+            let word_type = if excluded_words.contains(&word) {
+                WordType::Excluded
+            } else if bonus_words.contains(&word) {
+                WordType::Bonus
+            } else {
+                WordType::Normal
+            };
+            (word, word_type)
+        })
+        .collect::<Vec<(String, WordType)>>();
+
+    words.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+
     if cli.text {
         let counts = build::count_visits(
             &grid,
-            words.iter().filter(|&word| !bonus_words.contains::<str>(word)),
+            words.iter().filter_map(|&(ref word, word_type)| {
+                (word_type == WordType::Normal).then_some(word)
+            })
         );
 
-        print_text(&grid, &counts, words, &bonus_words);
+        print_text(&grid, &counts, words);
     } else {
-        print_json(&grid, words, &bonus_words);
+        print_json(&grid, words);
     }
 
     ExitCode::SUCCESS
