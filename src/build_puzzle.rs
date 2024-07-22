@@ -88,7 +88,6 @@ fn print_text(
 
 fn print_json(
     grid: &grid::Grid,
-    counts: &counts::GridCounts,
     words: Vec<String>,
     bonus_words: &HashSet<String>,
 ) {
@@ -103,19 +102,7 @@ fn print_json(
         }
     }
 
-    print!("\",\"counts\":[");
-
-    for y in 0..grid.height() {
-        for x in 0..grid.width() {
-            if x != 0 || y != 0 {
-                print!(",");
-            }
-            let count = counts.at(x, y);
-            print!("{},{}", count.starts, count.visits);
-        }
-    }
-
-    print!("],\"words\":{{");
+    print!("\",\"words\":{{");
 
     for (i, word) in words.into_iter().enumerate() {
         if i != 0 {
@@ -196,15 +183,15 @@ fn main() -> ExitCode {
     let words = build::search_words(&grid, &dictionary, cli.minimum_length);
     let mut words = words.into_iter().collect::<Vec<String>>();
     words.sort();
-    let counts = build::count_visits(
-        &grid,
-        words.iter().filter(|&word| !bonus_words.contains::<str>(word)),
-    );
-
     if cli.text {
+        let counts = build::count_visits(
+            &grid,
+            words.iter().filter(|&word| !bonus_words.contains::<str>(word)),
+        );
+
         print_text(&grid, &counts, words, &bonus_words);
     } else {
-        print_json(&grid, &counts, words, &bonus_words);
+        print_json(&grid, words, &bonus_words);
     }
 
     ExitCode::SUCCESS
