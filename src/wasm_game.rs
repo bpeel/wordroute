@@ -45,6 +45,7 @@ enum Page {
     Game,
     Instructions,
     Share,
+    ExcludedWord,
 }
 
 fn show_error(message: &str) {
@@ -576,6 +577,8 @@ impl Wordroute {
             "close-instructions",
             "close-instructions-cross",
             "close-share-cross",
+            "close-excluded-word",
+            "close-excluded-word-cross",
         ] {
             let Some(close_button) =
                 self.context.document.get_element_by_id(id)
@@ -1043,6 +1046,10 @@ impl Wordroute {
             page == Page::Instructions,
         );
         self.set_element_visibility("share-overlay", page == Page::Share);
+        self.set_element_visibility(
+            "excluded-word-overlay",
+            page == Page::ExcludedWord,
+        );
     }
 
     fn remove_loading_class(&self) {
@@ -1090,6 +1097,10 @@ impl Wordroute {
 
         for length in self.puzzle.changed_word_lists() {
             self.update_word_list_for_length(length);
+        }
+
+        if self.puzzle.pending_excluded_word() {
+            self.set_page(Page::ExcludedWord);
         }
     }
 
@@ -1525,6 +1536,8 @@ fn parse_words(data: &JsValue) -> Result<Vec<(String, WordType)>, ()> {
             WordType::Normal
         } else if type_num == 1.0 {
             WordType::Bonus
+        } else if type_num == 2.0 {
+            WordType::Excluded
         } else {
             show_error("Unknown word type");
             return Err(());

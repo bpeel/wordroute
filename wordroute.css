@@ -6,7 +6,7 @@ body {
     margin-bottom: 0px;
 }
 
-#instructions-overlay, #share-overlay {
+#instructions-overlay, #share-overlay, #excluded-word-overlay {
     background-color: rgba(200, 200, 200, 190);
     position: absolute;
     left: 0px;
@@ -15,7 +15,7 @@ body {
     min-height: 100vh;
 }
 
-#content, #instructions, #share {
+#content, #instructions, #share, #excluded-word {
     display: flex;
     flex-direction: column;
     background-color: #fff;
@@ -32,7 +32,7 @@ body {
     margin-bottom: 1em;
 }
 
-#instructions p, #share p {
+#instructions p, #share p, #excluded-word p {
     margin: 2em;
     text-align: center;
 }
@@ -250,7 +250,7 @@ h1, h2, #current-word, #word-message, #word-count {
 }
 
 @media only all and (max-width: 45em) {
-    #content, #instructions, #share {
+    #content, #instructions, #share, #exluded-word {
         position: absolute;
         top: 0px;
         left: 0px;
@@ -262,7 +262,7 @@ h1, h2, #current-word, #word-message, #word-count {
 }
 
 @media not all and (max-width: 45em) {
-    #content, #instructions, #share {
+    #content, #instructions, #share, #excluded-word {
         max-width: 40em;
         margin-left: auto;
         margin-right: auto;
