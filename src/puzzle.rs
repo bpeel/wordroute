@@ -70,6 +70,7 @@ pub struct Puzzle {
     pending_word_message: String,
 
     pending_excluded_word: bool,
+    pending_finish: bool,
 
     counts_dirty: u64,
     n_words_found_dirty: bool,
@@ -135,6 +136,7 @@ impl Puzzle {
             pending_word_message: String::new(),
 
             pending_excluded_word: false,
+            pending_finish: false,
 
             counts_dirty,
             n_words_found_dirty: true,
@@ -221,6 +223,10 @@ impl Puzzle {
                     WordType::Normal => {
                         show_word_message!(self, "+{} points!", length);
                         self.score_normal_word(word, length);
+
+                        if self.n_words_found >= self.total_n_words {
+                            self.pending_finish = true;
+                        }
                     }
                     WordType::Excluded => self.pending_excluded_word = true,
                 }
@@ -285,6 +291,10 @@ impl Puzzle {
 
     pub fn pending_excluded_word(&mut self) -> bool {
         std::mem::replace(&mut self.pending_excluded_word, false)
+    }
+
+    pub fn pending_finish(&mut self) -> bool {
+        std::mem::replace(&mut self.pending_finish, false)
     }
 
     pub fn changed_counts(&mut self) -> ChangedCounts {
@@ -885,6 +895,37 @@ mod test {
                     word.found &&
                     word.word_type == WordType::Excluded
             }).is_some()
+        );
+    }
+
+    #[test]
+    fn finish() {
+        let mut puzzle = four_line_puzzle();
+
+        assert!(!puzzle.pending_finish());
+
+        puzzle.score_word("potato");
+        assert!(!puzzle.pending_finish());
+
+        puzzle.score_word("stomp");
+        assert!(!puzzle.pending_finish());
+
+        puzzle.score_word("whips");
+        assert!(puzzle.pending_finish());
+        assert!(!puzzle.pending_finish());
+
+        let mut puzzle = four_line_puzzle();
+
+        // Assert that loading a completed save state doesn’t trigger
+        // a finish
+        puzzle.load_save_state(
+            &"0.0.e".parse::<SaveState>().unwrap(),
+        );
+
+        assert!(!puzzle.pending_excluded_word());
+        assert_eq!(
+            puzzle.changed_n_words_found().unwrap(),
+            puzzle.total_n_words(),
         );
     }
 }
