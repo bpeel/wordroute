@@ -83,7 +83,6 @@ pub struct Puzzle {
 impl Puzzle {
     pub fn new<I>(
         grid: Grid,
-        counts: GridCounts,
         words: I,
     ) -> Puzzle
         where I: IntoIterator<Item = (String, WordType)>
@@ -118,12 +117,24 @@ impl Puzzle {
             }
         }
 
+        let mut word_finder = word_finder::Finder::new();
+        let mut route_buf = Vec::new();
+
+        let counts = generate_counts(
+            &grid,
+            &mut word_finder,
+            &mut route_buf,
+            words.iter().filter_map(|(key, word)| {
+                (word.word_type == WordType::Normal).then_some(key)
+            }),
+        );
+
         Puzzle {
             grid,
             counts,
             words,
-            word_finder: word_finder::Finder::new(),
-            route_buf: Vec::new(),
+            word_finder,
+            route_buf,
             n_words_found: 0,
             total_n_words,
             n_letters_found: 0,
@@ -525,27 +536,43 @@ impl<'a> Words<'a> {
     }
 }
 
+fn generate_counts<I, T>(
+    grid: &Grid,
+    word_finder: &mut word_finder::Finder,
+    route_buf: &mut Vec<u8>,
+    words: I,
+) -> GridCounts
+    where I: IntoIterator<Item = T>,
+          T: AsRef<str>
+{
+    let mut counts = GridCounts::new(grid.width(), grid.height());
+
+    for word in words {
+        route_buf.clear();
+
+        if let Some((mut x, mut y)) = word_finder.find(
+            grid,
+            word.as_ref(),
+            route_buf,
+        ) {
+            let start = counts.at_mut(x, y);
+            start.starts += 1;
+            start.visits += 1;
+
+            for &dir in route_buf.iter() {
+                (x, y) = directions::step(x, y, dir);
+
+                counts.at_mut(x, y).visits += 1;
+            }
+        }
+    }
+
+    counts
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-
-    fn make_counts<I: IntoIterator<Item = (u8, u8)>>(
-        grid: &Grid,
-        counts_data: I,
-    ) -> GridCounts {
-        let mut counts = GridCounts::new(grid.width(), grid.height());
-
-        for (i, (starts, visits)) in counts_data.into_iter().enumerate() {
-            let counts = counts.at_mut(
-                i as u32 % grid.width(),
-                i as u32 / grid.width(),
-            );
-            counts.starts = starts;
-            counts.visits = visits;
-        }
-
-        counts
-    }
 
     fn four_line_puzzle() -> Puzzle {
         let grid = Grid::new(
@@ -555,22 +582,8 @@ mod test {
              yyyyyyyyyyyyyyyy"
         ).unwrap();
 
-        let counts_data = vec![
-            (2, 2), (0, 2), (0, 2), (0, 2), (0, 2), (0, 2), (1, 2), (0, 2),
-            (0, 2), (0, 2), (0, 2), (1, 2), (0, 2), (0, 2), (0, 2), (0, 2),
-            (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1),
-            (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1),
-            (1, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1),
-            (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1),
-            (1, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1),
-            (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1)
-        ];
-
-        let counts = make_counts(&grid, counts_data);
-
         Puzzle::new(
             grid,
-            counts,
             vec![
                 ("potato".to_string(), WordType::Normal),
                 ("stomp".to_string(), WordType::Normal),
@@ -651,10 +664,10 @@ mod test {
             ],
         );
 
-        assert_eq!(puzzle.counts().at(0, 0).starts, 1);
-        assert_eq!(puzzle.counts().at(0, 0).visits, 1);
+        assert_eq!(puzzle.counts().at(0, 0).starts, 0);
+        assert_eq!(puzzle.counts().at(0, 0).visits, 0);
         assert_eq!(puzzle.counts().at(0, 1).starts, 0);
-        assert_eq!(puzzle.counts().at(0, 1).visits, 1);
+        assert_eq!(puzzle.counts().at(0, 1).visits, 0);
 
         assert!(puzzle.changed_counts().next().is_none());
 
@@ -768,17 +781,8 @@ mod test {
     fn wordy_puzzle() -> Puzzle {
         let grid = Grid::new(".or\nabe\n.ts").unwrap();
 
-        let counts_data = [
-            (0, 0), (1, 8), (3, 5),
-            (0, 4), (6, 9), (0, 5),
-            (0, 0), (0, 5), (0, 7)
-        ];
-
-        let counts = make_counts(&grid, counts_data);
-
         Puzzle::new(
             grid,
-            counts,
             vec![
                 ("bats".to_string(), WordType::Normal),
                 ("best".to_string(), WordType::Normal),
@@ -927,5 +931,37 @@ mod test {
             puzzle.changed_n_words_found().unwrap(),
             puzzle.total_n_words(),
         );
+    }
+
+    #[test]
+    fn counts() {
+        let puzzle = wordy_puzzle();
+
+        assert_eq!(puzzle.counts.at(0, 0).starts, 0);
+        assert_eq!(puzzle.counts.at(0, 0).visits, 0);
+
+        assert_eq!(puzzle.counts.at(1, 0).starts, 1);
+        assert_eq!(puzzle.counts.at(1, 0).visits, 8);
+
+        assert_eq!(puzzle.counts.at(2, 0).starts, 3);
+        assert_eq!(puzzle.counts.at(2, 0).visits, 5);
+
+        assert_eq!(puzzle.counts.at(0, 1).starts, 0);
+        assert_eq!(puzzle.counts.at(0, 1).visits, 4);
+
+        assert_eq!(puzzle.counts.at(1, 1).starts, 6);
+        assert_eq!(puzzle.counts.at(1, 1).visits, 9);
+
+        assert_eq!(puzzle.counts.at(2, 1).starts, 0);
+        assert_eq!(puzzle.counts.at(2, 1).visits, 5);
+
+        assert_eq!(puzzle.counts.at(0, 2).starts, 0);
+        assert_eq!(puzzle.counts.at(0, 2).visits, 0);
+
+        assert_eq!(puzzle.counts.at(1, 2).starts, 0);
+        assert_eq!(puzzle.counts.at(1, 2).visits, 5);
+
+        assert_eq!(puzzle.counts.at(2, 2).starts, 0);
+        assert_eq!(puzzle.counts.at(2, 2).visits, 7);
     }
 }

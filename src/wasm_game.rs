@@ -333,7 +333,7 @@ impl Wordroute {
 
         let geometry = Geometry::new(&grid, 100.0);
 
-        let puzzle = Puzzle::new(grid, counts, words);
+        let puzzle = Puzzle::new(grid, words);
 
         let mut wordroute = Box::new(Wordroute {
             context,
