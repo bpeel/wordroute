@@ -36,10 +36,14 @@ impl fmt::Display for Error {
     }
 }
 
+fn lines(s: &str) -> std::str::Split<&[char]> {
+    s.split(&['\n', ':'])
+}
+
 impl Grid {
     pub fn new(s: &str) -> Result<Grid, Error> {
         // Find the longest line
-        let width = s.lines().map(|line| {
+        let width = lines(s).map(|line| {
             line.chars().filter(|ch| !ch.is_whitespace()).count()
         }).max().unwrap_or(0);
 
@@ -49,7 +53,7 @@ impl Grid {
 
         let mut values = Vec::new();
 
-        for (row, line) in s.lines().enumerate() {
+        for (row, line) in lines(s).enumerate() {
             let line = line.trim_end();
 
             if !line.is_empty() {
@@ -151,6 +155,22 @@ mod test {
         let grid = Grid::new(
             "  a     b     c\n\
              d  e\tf",
+        ).unwrap();
+
+        assert_eq!(grid.width(), 3);
+        assert_eq!(grid.height(), 2);
+        assert_eq!(grid.at(0, 0), 'a');
+        assert_eq!(grid.at(1, 0), 'b');
+        assert_eq!(grid.at(2, 0), 'c');
+        assert_eq!(grid.at(0, 1), 'd');
+        assert_eq!(grid.at(1, 1), 'e');
+        assert_eq!(grid.at(2, 1), 'f');
+    }
+
+    #[test]
+    fn colons() {
+        let grid = Grid::new(
+            "  a b c   :  d ef"
         ).unwrap();
 
         assert_eq!(grid.width(), 3);
