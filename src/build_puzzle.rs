@@ -33,7 +33,7 @@ struct Cli {
     #[arg(short, long, value_name = "FILE")]
     dictionary: OsString,
     #[arg(short, long, value_name = "FILE")]
-    bonus_words: Option<OsString>,
+    bonus_words: Vec<OsString>,
     #[arg(short, long, value_name = "LENGTH", default_value_t = 4)]
     minimum_length: usize,
     #[arg(short, long)]
@@ -121,11 +121,10 @@ fn print_json(
     println!("}}}}");
 }
 
-fn read_bonus_words<P: AsRef<Path>>(
+fn read_word_list_from_file<P: AsRef<Path>>(
     filename: P,
-) -> Result<HashSet<String>, std::io::Error> {
-    let mut words = HashSet::new();
-
+    words: &mut HashSet<String>,
+) -> Result<(), std::io::Error> {
     for line in BufReader::new(std::fs::File::open(filename)?).lines() {
         let line = line?;
         let line = line.trim();
@@ -133,6 +132,31 @@ fn read_bonus_words<P: AsRef<Path>>(
         if !line.is_empty() && !line.starts_with('#') {
             words.insert(line.to_string());
         }
+    }
+
+    Ok(())
+}
+
+fn read_word_list<I, P>(
+    filenames: I,
+) -> Result<HashSet<String>, std::io::Error>
+    where I: IntoIterator<Item = P>,
+          P: AsRef<Path>,
+{
+    let mut words = HashSet::new();
+
+    for filename in filenames {
+        read_word_list_from_file(&filename, &mut words)
+            .map_err(|e| {
+                let kind = e.kind();
+                std::io::Error::new(
+                    kind,
+                    format!(
+                        "{}: {}",
+                        filename.as_ref().to_string_lossy(),
+                        e,
+                    ))
+            })?;
     }
 
     Ok(words)
@@ -149,17 +173,12 @@ fn main() -> ExitCode {
         },
     };
 
-    let bonus_words = match cli.bonus_words {
-        Some(filename) => {
-            match read_bonus_words(&filename) {
-                Ok(d) => d,
-                Err(e) => {
-                    eprintln!("{}: {}", filename.to_string_lossy(), e);
-                    return ExitCode::FAILURE;
-                },
-            }
-        },
-        None => HashSet::new(),
+    let bonus_words = match read_word_list(cli.bonus_words.iter()) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("{}", e);
+            return ExitCode::FAILURE;
+        }
     };
 
     let dictionary = dictionary::Dictionary::new(dictionary.into_boxed_slice());
