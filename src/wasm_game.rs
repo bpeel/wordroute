@@ -33,10 +33,19 @@ const SVG_NAMESPACE: &'static str = "http://www.w3.org/2000/svg";
 const ROUTE_ID: &'static str = "route-line";
 const SORT_HINT_CHECKBOX_ID: &'static str = "sort-hint-checkbox";
 const LETTERS_HINT_CHECKBOX_ID: &'static str = "letters-hint-checkbox";
+const SHARE_TEXT_COPIED_ID: &'static str = "share-text-copied";
+const SHARE_TEXT_ID: &'static str = "share-text";
 
 const STARTS_HINT_LEVEL: usize = 1;
 const VISITS_HINT_LEVEL: usize = 2;
 const WORDS_HINT_LEVEL: usize = 3;
+
+#[derive(PartialEq, Eq, Copy, Clone)]
+enum Page {
+    Game,
+    Instructions,
+    Share,
+}
 
 fn show_error(message: &str) {
     console::log_1(&message.into());
@@ -243,6 +252,8 @@ struct Wordroute {
     visibility_closure: Option<Closure::<dyn Fn(JsValue)>>,
     close_closure: Option<Closure::<dyn Fn(JsValue)>>,
     help_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    share_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    copy_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
     word_count: web_sys::HtmlElement,
     score_bar: web_sys::HtmlElement,
@@ -333,6 +344,8 @@ impl Wordroute {
             visibility_closure: None,
             close_closure: None,
             help_closure: None,
+            share_closure: None,
+            copy_closure: None,
             game_contents,
             word_count,
             score_bar,
@@ -359,6 +372,8 @@ impl Wordroute {
         wordroute.create_closures();
         wordroute.set_up_close_button();
         wordroute.set_up_help_button();
+        wordroute.set_up_share_button();
+        wordroute.set_up_copy_button();
         wordroute.update_title(chosen_puzzle);
         wordroute.create_word_lists()?;
 
@@ -374,7 +389,7 @@ impl Wordroute {
         wordroute.show_game_contents();
 
         if save_states.is_empty() {
-            wordroute.set_instructions_visibility(true);
+            wordroute.set_page(Page::Instructions);
         }
 
         Ok(wordroute)
@@ -553,11 +568,16 @@ impl Wordroute {
         let close_closure = Closure::<dyn Fn(JsValue)>::new(
             move |_event: JsValue| {
                 let wordroute = unsafe { &mut *wordroute_pointer };
-                wordroute.set_instructions_visibility(false);
+                wordroute.set_page(Page::Game);
             }
         );
 
-        for id in ["close-instructions", "close-instructions-cross"] {
+        for id in [
+            "close-instructions",
+            "close-instructions-cross",
+            "close-share",
+            "close-share-cross",
+        ] {
             let Some(close_button) =
                 self.context.document.get_element_by_id(id)
                 .and_then(|c| c.dyn_into::<web_sys::EventTarget>().ok())
@@ -580,7 +600,7 @@ impl Wordroute {
         let help_closure = Closure::<dyn Fn(JsValue)>::new(
             move |_event: JsValue| {
                 let wordroute = unsafe { &mut *wordroute_pointer };
-                wordroute.set_instructions_visibility(true);
+                wordroute.set_page(Page::Instructions);
             }
         );
 
@@ -597,6 +617,99 @@ impl Wordroute {
         );
 
         self.help_closure = Some(help_closure);
+    }
+
+    fn set_up_share_button(&mut self) {
+        let wordroute_pointer = self as *mut Wordroute;
+
+        let share_closure = Closure::<dyn Fn(JsValue)>::new(
+            move |_event: JsValue| {
+                let wordroute = unsafe { &*wordroute_pointer };
+                wordroute.show_share_page();
+            }
+        );
+
+        let Some(share_button) =
+            self.context.document.get_element_by_id("share-button")
+            .and_then(|c| c.dyn_into::<web_sys::EventTarget>().ok())
+        else {
+            return;
+        };
+
+        let _ = share_button.add_event_listener_with_callback(
+            "click",
+            share_closure.as_ref().unchecked_ref(),
+        );
+
+        self.share_closure = Some(share_closure);
+    }
+
+    fn set_up_copy_button(&mut self) {
+        let wordroute_pointer = self as *mut Wordroute;
+
+        let copy_closure = Closure::<dyn Fn(JsValue)>::new(
+            move |_event: JsValue| {
+                let wordroute = unsafe { &*wordroute_pointer };
+                wordroute.copy_share_text();
+            }
+        );
+
+        let Some(copy_button) =
+            self.context.document.get_element_by_id("copy-share")
+            .and_then(|c| c.dyn_into::<web_sys::EventTarget>().ok())
+        else {
+            return;
+        };
+
+        let _ = copy_button.add_event_listener_with_callback(
+            "click",
+            copy_closure.as_ref().unchecked_ref(),
+        );
+
+        self.copy_closure = Some(copy_closure);
+    }
+
+    fn show_share_page(&self) {
+        if let Some(share_text_elem) =
+            self.context.document.get_element_by_id(SHARE_TEXT_ID)
+        {
+            let mut share_text = self.puzzle.share_text(self.chosen_puzzle);
+
+            if let Some(url) = self.context.document.location()
+                .and_then(|location| location.href().ok())
+            {
+                share_text.push('\n');
+                share_text.push_str(&url);
+            }
+
+            set_element_text(&share_text_elem, &share_text);
+
+            self.set_element_visibility(SHARE_TEXT_COPIED_ID, false);
+        }
+
+        self.set_page(Page::Share);
+    }
+
+    fn copy_share_text(&self) {
+        let Some(share_text_elem) =
+            self.context.document.get_element_by_id(SHARE_TEXT_ID)
+            .and_then(|c| c.dyn_into::<web_sys::HtmlTextAreaElement>().ok())
+        else {
+            console::log_1(&"Error getting share text element".into());
+            return;
+        };
+
+        share_text_elem.select();
+
+        let copy_result = self.context.document.exec_command("copy");
+
+        let _ = share_text_elem.set_selection_range(0, 0);
+
+        if copy_result.is_err() {
+            console::log_1(&"copy command failed".into());
+        } else {
+            self.set_element_visibility(SHARE_TEXT_COPIED_ID, true);
+        }
     }
 
     fn create_letters(&mut self) -> Result<(), String> {
@@ -912,26 +1025,25 @@ impl Wordroute {
         }
     }
 
-    fn set_instructions_visibility(&mut self, visibility: bool) {
-        if let Some(instructions) =
-            self.context.document.get_element_by_id("instructions-overlay")
+    fn set_element_visibility(&self, id: &str, visibility: bool) {
+        if let Some(elem) =
+            self.context.document.get_element_by_id(id)
             .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
         {
-            let _ = instructions.style().set_property(
+            let _ = elem.style().set_property(
                 "display",
                 if visibility { "block" } else { "none" },
             );
         }
+    }
 
-        if let Some(content) =
-            self.context.document.get_element_by_id("content")
-            .and_then(|c| c.dyn_into::<web_sys::HtmlElement>().ok())
-        {
-            let _ = content.style().set_property(
-                "display",
-                if visibility { "none" } else { "block" },
-            );
-        }
+    fn set_page(&self, page: Page) {
+        self.set_element_visibility("content", page == Page::Game);
+        self.set_element_visibility(
+            "instructions-overlay",
+            page == Page::Instructions,
+        );
+        self.set_element_visibility("share-overlay", page == Page::Share);
     }
 
     fn remove_loading_class(&self) {

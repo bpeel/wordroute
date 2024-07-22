@@ -37,6 +37,7 @@ features = [
          "Response",
          "HtmlElement",
          "HtmlInputElement",
+         "HtmlTextAreaElement",
          "SvgElement",
          "Text",
          "RequestInit",

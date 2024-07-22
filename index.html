@@ -44,6 +44,7 @@
             <rect x="0" y="0" width="35.9674" height="35.9674" fill="#0000" />
           </a>
         </svg>
+        <div class="title-space"></div>
         <h1 id="title">WordRoute</h1>
         <svg id="help-button" viewBox="0 0 35.967396 35.9674">
           <path fill="black"
@@ -64,6 +65,15 @@
                    -0.556,1.051 -1.947,2.380 l -1.360,1.329 q -0.726,0.726
                    -1.036,1.144 -0.294,0.402 -0.417,0.788 -0.093,0.325
                    -0.139,0.788 -0.046,0.464 -0.046,1.267 z" />
+        </svg>
+        <svg id="share-button" viewBox="0 0 35.9674 35.9674">
+          <circle fill="#000" r="4.916" cy="6.529" cx="29.016" />
+          <circle fill="#000" r="4.916" cy="17.984" cx="6.952" />
+          <circle fill="#000" r="4.916" cy="29.438" cx="29.016" />
+          <path fill="none" stroke="#000"
+                stroke-width="4.812" stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M 29.206,6.582 6.940,18.149 29.206,29.715" />
         </svg>
       </div>
       <p id="message" style="display: block">Loading…</p>
@@ -139,6 +149,28 @@
         </ul>
         <p>Good luck!</p>
         <button id="close-instructions">Close</button>
+      </div>
+    </div>
+    <div id="share-overlay" style="display: none">
+      <div id="share">
+        <div class="title-bar">
+          <div class="title-space"></div>
+          <h1 id="title">Share</h1>
+          <svg id="close-share-cross" viewBox="0 0 35.967396 35.9674">
+            <path stroke="black" stroke-width="5"
+                  d="M 32.670,3.245 l -28.990,29.793
+                     m 0,-29.793 28.990,29.793" />
+          </svg>
+        </div>
+        <textarea id="share-text" rows="6" readonly></textarea>
+        <button id="copy-share">Copy</button>
+        <p id="share-text-copied" style="display: none">
+          Text copied to the clipboard!
+        </p>
+        <p>
+          Thanks for playing WordRoute!
+        </p>
+        <button id="close-share">Close</button>
       </div>
     </div>
   </body>
