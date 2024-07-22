@@ -1102,9 +1102,13 @@ impl Wordroute {
         if self.puzzle.pending_excluded_word() {
             self.set_page(Page::ExcludedWord);
         }
+
+        if self.puzzle.pending_finish() {
+            self.set_contents_style("finished", true);
+        }
     }
 
-    fn set_hint_style(&self, style: &str, value: bool) {
+    fn set_contents_style(&self, style: &str, value: bool) {
         let class_list = self.game_contents.class_list();
 
         if value {
@@ -1163,15 +1167,15 @@ impl Wordroute {
     }
 
     fn update_hint_level(&mut self, hint_level: usize) {
-        self.set_hint_style(
+        self.set_contents_style(
             "no-starts-hint",
             hint_level < STARTS_HINT_LEVEL,
         );
-        self.set_hint_style(
+        self.set_contents_style(
             "no-visits-hint",
             hint_level < VISITS_HINT_LEVEL,
         );
-        self.set_hint_style(
+        self.set_contents_style(
             "no-words-hint",
             hint_level < WORDS_HINT_LEVEL,
         );
