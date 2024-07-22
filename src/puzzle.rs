@@ -43,6 +43,7 @@ macro_rules! show_word_message {
 pub enum WordType {
     Normal,
     Bonus,
+    Excluded,
 }
 
 pub struct Word {
@@ -67,6 +68,8 @@ pub struct Puzzle {
 
     has_pending_word_message: bool,
     pending_word_message: String,
+
+    pending_excluded_word: bool,
 
     counts_dirty: u64,
     n_words_found_dirty: bool,
@@ -130,6 +133,8 @@ impl Puzzle {
 
             has_pending_word_message: false,
             pending_word_message: String::new(),
+
+            pending_excluded_word: false,
 
             counts_dirty,
             n_words_found_dirty: true,
@@ -206,6 +211,7 @@ impl Puzzle {
                     WordType::Normal => {
                         self.show_word_message("Already found");
                     }
+                    WordType::Excluded => self.pending_excluded_word = true,
                 }
             } else {
                 self.save_state_dirty = true;
@@ -216,6 +222,7 @@ impl Puzzle {
                         show_word_message!(self, "+{} points!", length);
                         self.score_normal_word(word, length);
                     }
+                    WordType::Excluded => self.pending_excluded_word = true,
                 }
             }
         } else {
@@ -274,6 +281,10 @@ impl Puzzle {
         } else {
             None
         }
+    }
+
+    pub fn pending_excluded_word(&mut self) -> bool {
+        std::mem::replace(&mut self.pending_excluded_word, false)
     }
 
     pub fn changed_counts(&mut self) -> ChangedCounts {
@@ -762,7 +773,7 @@ mod test {
                 ("boats".to_string(), WordType::Normal),
                 ("bore".to_string(), WordType::Normal),
                 ("bores".to_string(), WordType::Normal),
-                ("brest".to_string(), WordType::Bonus),
+                ("brest".to_string(), WordType::Excluded),
                 ("estab".to_string(), WordType::Bonus),
                 ("oats".to_string(), WordType::Normal),
                 ("robe".to_string(), WordType::Normal),
@@ -785,7 +796,7 @@ mod test {
 
         puzzle.score_word("bats");
         puzzle.score_word("best");
-        puzzle.score_word("brest");
+        puzzle.score_word("estab");
 
         assert_eq!(
             puzzle.share_text(12),
@@ -793,7 +804,7 @@ mod test {
              2/10 words (+1 bonus word)",
         );
 
-        puzzle.score_word("estab");
+        puzzle.score_word("sebat");
 
         assert_eq!(
             puzzle.share_text(12),
@@ -841,6 +852,36 @@ mod test {
             puzzle.share_text(42),
             "I played WordRoute #42\n\
              10/10 words (+2 bonus words)",
+        );
+    }
+
+    #[test]
+    fn excluded_word() {
+        let mut puzzle = wordy_puzzle();
+
+        assert!(!puzzle.pending_excluded_word());
+
+        puzzle.score_word("brest");
+
+        assert!(puzzle.pending_excluded_word());
+        assert!(!puzzle.pending_excluded_word());
+
+        let mut puzzle = wordy_puzzle();
+
+        // Assert that loading a save state that marks an excluded
+        // word as found doesn’t set a pending excluded word.
+        puzzle.load_save_state(
+            &"0.0.40".parse::<SaveState>().unwrap(),
+        );
+
+        assert!(!puzzle.pending_excluded_word());
+
+        assert!(
+            puzzle.words().find(|(key, word)| {
+                key == &"brest" &&
+                    word.found &&
+                    word.word_type == WordType::Excluded
+            }).is_some()
         );
     }
 }
