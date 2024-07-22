@@ -420,8 +420,11 @@ impl Puzzle {
             if self.misses == 0 {
                 text.push_str("\n🎯 Perfect accuracy");
             } else {
-                let total_guesses = self.misses as usize + self.total_n_words;
-                let accuracy = ((self.total_n_words * 100 +
+                let total_guesses =
+                    self.misses as usize +
+                    self.total_n_words +
+                    n_bonus_words;
+                let accuracy = (((total_guesses - self.misses as usize) * 100 +
                                  total_guesses / 2) /
                                 total_guesses)
                     .min(99);
@@ -835,7 +838,7 @@ mod test {
              🎯 Perfect accuracy",
         );
 
-        for _ in 0..3 {
+        for _ in 0..4 {
             puzzle.score_word("notaword");
         }
 
@@ -843,7 +846,7 @@ mod test {
             puzzle.share_text(42),
             "I played WordRoute #42\n\
              10/10 words (+2 bonus words)\n\
-             🎯 77% accuracy",
+             🎯 75% accuracy",
         );
 
         puzzle.score_word("stillnotaword");
