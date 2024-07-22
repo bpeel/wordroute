@@ -575,7 +575,6 @@ impl Wordroute {
         for id in [
             "close-instructions",
             "close-instructions-cross",
-            "close-share",
             "close-share-cross",
         ] {
             let Some(close_button) =
