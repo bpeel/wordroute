@@ -255,6 +255,7 @@ struct Wordroute {
     help_closure: Option<Closure::<dyn Fn(JsValue)>>,
     share_closure: Option<Closure::<dyn Fn(JsValue)>>,
     copy_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    animation_closure: Option<Closure::<dyn Fn()>>,
     game_contents: web_sys::HtmlElement,
     word_count: web_sys::HtmlElement,
     score_bar: web_sys::HtmlElement,
@@ -347,6 +348,7 @@ impl Wordroute {
             help_closure: None,
             share_closure: None,
             copy_closure: None,
+            animation_closure: None,
             game_contents,
             word_count,
             score_bar,
@@ -1104,8 +1106,30 @@ impl Wordroute {
         }
 
         if self.puzzle.pending_finish() {
-            self.set_contents_style("finished", true);
+            self.start_finish_animation();
         }
+    }
+
+    fn start_finish_animation(&mut self) {
+        self.set_contents_style("finished", true);
+
+        let wordroute_pointer = self as *const Wordroute;
+
+        let closure = self.animation_closure.get_or_insert_with(|| {
+            Closure::<dyn Fn()>::new(move || {
+                let wordroute = unsafe { &*wordroute_pointer };
+                wordroute.set_contents_style("finished", false);
+                wordroute.show_share_page();
+            })
+        });
+
+        let _ = self
+            .context
+            .window
+            .set_timeout_with_callback_and_timeout_and_arguments_0(
+                closure.as_ref().unchecked_ref(),
+                1_000,
+            );
     }
 
     fn set_contents_style(&self, style: &str, value: bool) {
