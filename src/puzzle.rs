@@ -19,6 +19,7 @@ use super::counts::GridCounts;
 use super::word_finder;
 use super::directions;
 use super::save_state::SaveState;
+use super::puzzle_data::WordType;
 use std::collections::{hash_map, HashMap, HashSet};
 use std::fmt::Write;
 
@@ -37,13 +38,6 @@ macro_rules! show_word_message {
             $puzzle.has_pending_word_message = true;
         }
     }
-}
-
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum WordType {
-    Normal,
-    Bonus,
-    Excluded,
 }
 
 pub struct Word {
