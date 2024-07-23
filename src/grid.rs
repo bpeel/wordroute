@@ -36,6 +36,22 @@ impl fmt::Display for Error {
     }
 }
 
+impl fmt::Display for Grid {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for y in 0..self.height() {
+            if y > 0 {
+                write!(f, ":")?;
+            }
+
+            for x in 0..self.width() {
+                write!(f, "{}", self.at(x, y))?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 fn lines(s: &str) -> std::str::Split<&[char]> {
     s.split(&['\n', ':'])
 }
@@ -181,5 +197,11 @@ mod test {
         assert_eq!(grid.at(0, 1), 'd');
         assert_eq!(grid.at(1, 1), 'e');
         assert_eq!(grid.at(2, 1), 'f');
+    }
+
+    #[test]
+    fn format() {
+        assert_eq!(&Grid::new("a").unwrap().to_string(), "a");
+        assert_eq!(&Grid::new("abc\ndef").unwrap().to_string(), "abc:def");
     }
 }
