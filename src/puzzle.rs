@@ -19,7 +19,7 @@ use super::counts::GridCounts;
 use super::word_finder;
 use super::directions;
 use super::save_state::SaveState;
-use super::puzzle_data::WordType;
+use super::puzzle_data::{PuzzleData, WordType};
 use std::collections::{hash_map, HashMap, HashSet};
 use std::fmt::Write;
 
@@ -75,13 +75,8 @@ pub struct Puzzle {
 }
 
 impl Puzzle {
-    pub fn new<I>(
-        grid: Grid,
-        words: I,
-    ) -> Puzzle
-        where I: IntoIterator<Item = (String, WordType)>
-    {
-        let words = words.into_iter()
+    pub fn new(data: PuzzleData) -> Puzzle {
+        let words = data.words.into_iter()
             .map(|(key, word_type)| {
                 let word = Word {
                     word_type,
@@ -101,7 +96,7 @@ impl Puzzle {
         }).sum::<usize>();
 
         let counts_dirty = u64::MAX >>
-            (u64::BITS - grid.width() * grid.height());
+            (u64::BITS - data.grid.width() * data.grid.height());
 
         let mut word_lists_dirty = 0;
 
@@ -115,7 +110,7 @@ impl Puzzle {
         let mut route_buf = Vec::new();
 
         let counts = generate_counts(
-            &grid,
+            &data.grid,
             &mut word_finder,
             &mut route_buf,
             words.iter().filter_map(|(key, word)| {
@@ -124,7 +119,7 @@ impl Puzzle {
         );
 
         Puzzle {
-            grid,
+            grid: data.grid,
             counts,
             words,
             word_finder,
@@ -576,9 +571,9 @@ mod test {
              yyyyyyyyyyyyyyyy"
         ).unwrap();
 
-        Puzzle::new(
+        Puzzle::new(PuzzleData {
             grid,
-            vec![
+            words: vec![
                 ("potato".to_string(), WordType::Normal),
                 ("stomp".to_string(), WordType::Normal),
                 ("whips".to_string(), WordType::Normal),
@@ -587,7 +582,7 @@ mod test {
                     WordType::Bonus,
                 ),
             ]
-        )
+        })
     }
 
     #[test]
@@ -775,9 +770,9 @@ mod test {
     fn wordy_puzzle() -> Puzzle {
         let grid = Grid::new(".or\nabe\n.ts").unwrap();
 
-        Puzzle::new(
+        Puzzle::new(PuzzleData {
             grid,
-            vec![
+            words: vec![
                 ("bats".to_string(), WordType::Normal),
                 ("best".to_string(), WordType::Normal),
                 ("boat".to_string(), WordType::Normal),
@@ -792,7 +787,7 @@ mod test {
                 ("robs".to_string(), WordType::Normal),
                 ("sebat".to_string(), WordType::Bonus),
             ]
-        )
+        })
     }
 
     #[test]

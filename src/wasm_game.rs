@@ -21,7 +21,7 @@ use super::grid_math::Geometry;
 use super::word_finder;
 use super::directions;
 use super::puzzle::{Puzzle, N_HINT_LEVELS};
-use super::puzzle_data::WordType;
+use super::puzzle_data::{PuzzleData, WordType};
 use super::save_state::{self, SaveState};
 use std::fmt::Write;
 use js_sys::Reflect;
@@ -236,11 +236,6 @@ struct Letter {
     visits: web_sys::SvgElement,
 }
 
-struct PuzzleData {
-    grid: Grid,
-    words: Vec<(String, WordType)>,
-}
-
 struct Wordroute {
     context: Context,
     pointerdown_closure: Option<Closure::<dyn Fn(JsValue)>>,
@@ -332,7 +327,7 @@ impl Wordroute {
 
         let geometry = Geometry::new(&grid, 100.0);
 
-        let puzzle = Puzzle::new(grid, words);
+        let puzzle = Puzzle::new(PuzzleData { grid, words });
 
         let mut wordroute = Box::new(Wordroute {
             context,
