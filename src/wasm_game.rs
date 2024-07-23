@@ -249,7 +249,8 @@ struct Wordroute {
     help_closure: Option<Closure::<dyn Fn(JsValue)>>,
     share_closure: Option<Closure::<dyn Fn(JsValue)>>,
     copy_closure: Option<Closure::<dyn Fn(JsValue)>>,
-    animation_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    finish_animation_closure: Option<Closure::<dyn Fn(JsValue)>>,
+    message_animation_closure: Option<Closure::<dyn Fn(JsValue)>>,
     game_contents: web_sys::HtmlElement,
     word_count: web_sys::HtmlElement,
     score_bar: web_sys::HtmlElement,
@@ -342,7 +343,8 @@ impl Wordroute {
             help_closure: None,
             share_closure: None,
             copy_closure: None,
-            animation_closure: None,
+            finish_animation_closure: None,
+            message_animation_closure: None,
             game_contents,
             word_count,
             score_bar,
@@ -1015,7 +1017,30 @@ impl Wordroute {
         self.word.clear();
     }
 
-    fn animate_word_message(&self) {
+    fn animate_word_message(&mut self) {
+        if self.message_animation_closure.is_none() {
+            let wordroute_pointer = self as *const Wordroute;
+
+            let closure = Closure::<dyn Fn(JsValue)>::new(move |_| {
+                let wordroute = unsafe { &*wordroute_pointer };
+                // Hide the word message whenever the animation is
+                // finished, otherwise whenever the page is changed
+                // and back the animation will restart.
+                let _ = wordroute.word_message
+                    .style()
+                    .set_property("display", "none");
+            });
+
+            let _ = self.word_message.add_event_listener_with_callback(
+                "animationend",
+                closure.as_ref().unchecked_ref(),
+            );
+
+            self.message_animation_closure = Some(closure);
+        };
+
+        let _ = self.word_message.style().set_property("display", "block");
+
         // Re-add the element to trigger the animation
         if let Some(parent) = self.word_message.parent_node() {
             self.word_message.remove();
@@ -1107,7 +1132,7 @@ impl Wordroute {
     fn start_finish_animation(&mut self) {
         self.set_contents_style("finished", true);
 
-        if self.animation_closure.is_none() {
+        if self.finish_animation_closure.is_none() {
             let wordroute_pointer = self as *const Wordroute;
 
             let closure = Closure::<dyn Fn(JsValue)>::new(move |_| {
@@ -1121,7 +1146,7 @@ impl Wordroute {
                 closure.as_ref().unchecked_ref(),
             );
 
-            self.animation_closure = Some(closure);
+            self.finish_animation_closure = Some(closure);
         }
     }
 
