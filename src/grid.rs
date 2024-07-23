@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::fmt;
+use super::shavicode;
 
 #[derive(Debug)]
 pub struct Grid {
@@ -44,7 +45,7 @@ impl fmt::Display for Grid {
             }
 
             for x in 0..self.width() {
-                write!(f, "{}", self.at(x, y))?;
+                write!(f, "{}", shavicode::encode_char(self.at(x, y)))?;
             }
         }
 
@@ -74,7 +75,14 @@ impl Grid {
 
             if !line.is_empty() {
                 values.resize(row * width, '.');
-                values.extend(line.chars().filter(|ch| !ch.is_whitespace()));
+                values.extend(
+                    line.chars()
+                        .filter_map(|ch| {
+                            (!ch.is_whitespace()).then(|| {
+                                shavicode::decode_char(ch)
+                            })
+                        })
+                );
             }
         }
 
@@ -122,28 +130,28 @@ mod test {
 
         assert_eq!(grid.width(), 1);
         assert_eq!(grid.height(), 2);
-        assert_eq!(grid.at(0, 0), 'a');
-        assert_eq!(grid.at(0, 1), 'b');
+        assert_eq!(grid.at(0, 0), '𐑪');
+        assert_eq!(grid.at(0, 1), '𐑫');
 
         let grid = Grid::new("a\nb\n     \n     ").unwrap();
 
         assert_eq!(grid.width(), 1);
         assert_eq!(grid.height(), 2);
-        assert_eq!(grid.at(0, 0), 'a');
-        assert_eq!(grid.at(0, 1), 'b');
+        assert_eq!(grid.at(0, 0), '𐑪');
+        assert_eq!(grid.at(0, 1), '𐑫');
     }
 
     #[test]
     fn short_lines() {
-        let grid = Grid::new("ab\nc\nd       ").unwrap();
+        let grid = Grid::new("AB\nC\nD       ").unwrap();
 
         assert_eq!(grid.width(), 2);
         assert_eq!(grid.height(), 3);
-        assert_eq!(grid.at(0, 0), 'a');
-        assert_eq!(grid.at(1, 0), 'b');
-        assert_eq!(grid.at(0, 1), 'c');
+        assert_eq!(grid.at(0, 0), '𐑐');
+        assert_eq!(grid.at(1, 0), '𐑑');
+        assert_eq!(grid.at(0, 1), '𐑒');
         assert_eq!(grid.at(1, 1), '.');
-        assert_eq!(grid.at(0, 2), 'd');
+        assert_eq!(grid.at(0, 2), '𐑓');
         assert_eq!(grid.at(1, 2), '.');
     }
 
@@ -175,12 +183,12 @@ mod test {
 
         assert_eq!(grid.width(), 3);
         assert_eq!(grid.height(), 2);
-        assert_eq!(grid.at(0, 0), 'a');
-        assert_eq!(grid.at(1, 0), 'b');
-        assert_eq!(grid.at(2, 0), 'c');
-        assert_eq!(grid.at(0, 1), 'd');
-        assert_eq!(grid.at(1, 1), 'e');
-        assert_eq!(grid.at(2, 1), 'f');
+        assert_eq!(grid.at(0, 0), '𐑪');
+        assert_eq!(grid.at(1, 0), '𐑫');
+        assert_eq!(grid.at(2, 0), '𐑬');
+        assert_eq!(grid.at(0, 1), '𐑭');
+        assert_eq!(grid.at(1, 1), '𐑮');
+        assert_eq!(grid.at(2, 1), '𐑯');
     }
 
     #[test]
@@ -191,12 +199,12 @@ mod test {
 
         assert_eq!(grid.width(), 3);
         assert_eq!(grid.height(), 2);
-        assert_eq!(grid.at(0, 0), 'a');
-        assert_eq!(grid.at(1, 0), 'b');
-        assert_eq!(grid.at(2, 0), 'c');
-        assert_eq!(grid.at(0, 1), 'd');
-        assert_eq!(grid.at(1, 1), 'e');
-        assert_eq!(grid.at(2, 1), 'f');
+        assert_eq!(grid.at(0, 0), '𐑪');
+        assert_eq!(grid.at(1, 0), '𐑫');
+        assert_eq!(grid.at(2, 0), '𐑬');
+        assert_eq!(grid.at(0, 1), '𐑭');
+        assert_eq!(grid.at(1, 1), '𐑮');
+        assert_eq!(grid.at(2, 1), '𐑯');
     }
 
     #[test]

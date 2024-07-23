@@ -142,31 +142,31 @@ mod test {
         let mut steps = Vec::new();
 
         let grid = Grid::new(
-            "a b c\n\
-              d e f\n\
-             g h i"
+            "𐑐 𐑑 𐑒\n\
+              𐑚 𐑔 𐑕\n\
+             𐑖 𐑗 𐑘"
         ).unwrap();
 
         steps.clear();
-        let (x, y) = finder.find(&grid, "abc", &mut steps).unwrap();
+        let (x, y) = finder.find(&grid, "𐑐𐑑𐑒", &mut steps).unwrap();
         assert_eq!(x, 0);
         assert_eq!(y, 0);
         assert_eq!(&steps, &[3, 3]);
 
         steps.clear();
-        let (x, y) = finder.find(&grid, "cba", &mut steps).unwrap();
+        let (x, y) = finder.find(&grid, "𐑒𐑑𐑐", &mut steps).unwrap();
         assert_eq!(x, 2);
         assert_eq!(y, 0);
         assert_eq!(&steps, &[2, 2]);
 
         steps.clear();
-        let (x, y) = finder.find(&grid, "adg", &mut steps).unwrap();
+        let (x, y) = finder.find(&grid, "𐑐𐑚𐑖", &mut steps).unwrap();
         assert_eq!(x, 0);
         assert_eq!(y, 0);
         assert_eq!(&steps, &[5, 4]);
 
         steps.clear();
-        let (x, y) = finder.find(&grid, "gda", &mut steps).unwrap();
+        let (x, y) = finder.find(&grid, "𐑖𐑚𐑐", &mut steps).unwrap();
         assert_eq!(x, 0);
         assert_eq!(y, 2);
         assert_eq!(&steps, &[1, 0]);
@@ -178,20 +178,20 @@ mod test {
         let mut steps = Vec::new();
 
         let grid = Grid::new(
-            "b a c k t r a p\n\
-              x x x x x x c k"
+            " 𐑚 𐑨 𐑒 𐑑 𐑮 𐑪 𐑐\
+             : . . . . 𐑨 𐑒"
         ).unwrap();
 
-        let (x, y) = finder.find(&grid, "backtrap", &mut steps).unwrap();
+        let (x, y) = finder.find(&grid, "𐑚𐑨𐑒𐑑𐑮𐑪𐑐", &mut steps).unwrap();
         assert_eq!(x, 0);
         assert_eq!(y, 0);
-        assert_eq!(&steps, &[3, 3, 3, 3, 3, 3, 3]);
+        assert_eq!(&steps, &[3, 3, 3, 3, 3, 3]);
 
         steps.clear();
-        let (x, y) = finder.find(&grid, "backtrack", &mut steps).unwrap();
+        let (x, y) = finder.find(&grid, "𐑚𐑨𐑒𐑑𐑮𐑨𐑒", &mut steps).unwrap();
         assert_eq!(x, 0);
         assert_eq!(y, 0);
-        assert_eq!(&steps, &[3, 3, 3, 3, 3, 3, 5, 3]);
+        assert_eq!(&steps, &[3, 3, 3, 3, 5, 3]);
     }
 
     #[test]
@@ -206,18 +206,18 @@ mod test {
         let mut finder = Finder::new();
         let mut steps = Vec::new();
         let grid = Grid::new(
-            "r e u\n\
-              e s x"
+            "𐑕 𐑑 𐑳\
+            : 𐑑 𐑯 ."
         ).unwrap();
 
-        // Make sure that the bottom ‘e’ was used for the last letter
-        // instead of reusing the top ‘e’.
+        // Make sure that the bottom ‘𐑑’ was used for the last letter
+        // instead of reusing the top ‘𐑑’.
 
-        let (x, y) = finder.find(&grid, "reuse", &mut steps).unwrap();
+        let (x, y) = finder.find(&grid, "𐑕𐑑𐑳𐑯𐑑", &mut steps).unwrap();
         assert_eq!(x, 0);
         assert_eq!(y, 0);
         assert_eq!(&steps, &[3, 3, 4, 2]);
 
-        assert!(finder.find(&grid, "reuser", &mut steps).is_none());
+        assert!(finder.find(&grid, "𐑕𐑑𐑳𐑯𐑑𐑕", &mut steps).is_none());
     }
 }

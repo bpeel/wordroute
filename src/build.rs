@@ -163,17 +163,18 @@ mod test {
     use super::*;
 
     fn make_dictionary() -> dictionary::Dictionary {
-        static DICTIONARY_BYTES: [u8; 33] = [
+        // Dictonary with the words 𐑕𐑑𐑨𐑓𐑑 and 𐑒𐑨𐑚
+        static DICTIONARY_BYTES: [u8; 57] = [
             0x00, 0x01, b'*',
-            0x0a, 0x01, b'c',
-            0x00, 0x01, b'a',
-            0x00, 0x01, b'b',
+            0x13, 0x04, 0xf0, 0x90, 0x91, 0x92, // 𐑒
+            0x00, 0x04, 0xf0, 0x90, 0x91, 0xa8, // 𐑨
+            0x00, 0x04, 0xf0, 0x90, 0x91, 0x9a, // 𐑚
             0x00, 0x00, b'\0',
-            0x00, 0x01, b's',
-            0x00, 0x01, b't',
-            0x00, 0x01, b'a',
-            0x00, 0x01, b'r',
-            0x00, 0x01, b't',
+            0x00, 0x04, 0xf0, 0x90, 0x91, 0x95, // 𐑕
+            0x00, 0x04, 0xf0, 0x90, 0x91, 0x91, // 𐑑
+            0x00, 0x04, 0xf0, 0x90, 0x91, 0xa8, // 𐑨
+            0x00, 0x04, 0xf0, 0x90, 0x91, 0x93, // 𐑓
+            0x00, 0x04, 0xf0, 0x90, 0x91, 0x91, // 𐑑
             0x00, 0x00, b'\0',
         ];
 
@@ -194,15 +195,15 @@ mod test {
 
     #[test]
     fn simple() {
-        assert_eq!(&search("cab", 3), &["cab"]);
-        assert_eq!(&search("start", 3), &["start"]);
+        assert_eq!(&search("𐑒𐑨𐑚", 3), &["𐑒𐑨𐑚"]);
+        assert_eq!(&search("𐑕𐑑𐑨𐑓𐑑", 3), &["𐑕𐑑𐑨𐑓𐑑"]);
         assert_eq!(
             &search(
-                "c a b s\n\
-                  t r a t",
+                " 𐑒 𐑨 𐑚 𐑕\
+                 : 𐑑 𐑓 𐑨 𐑑",
                 3,
             ),
-            &["cab", "start"],
+            &["𐑒𐑨𐑚", "𐑕𐑑𐑨𐑓𐑑"],
         );
     }
 
@@ -210,18 +211,18 @@ mod test {
     fn no_reuse() {
         assert!(
             &search(
-                ". s t\n\
-                  x r a",
+                " . 𐑕 𐑑\
+                 : 𐑿 𐑓 𐑨",
                 3,
             ).is_empty(),
         );
         assert_eq!(
             &search(
-                ". s t\n\
-                  t r a",
+                " . 𐑕 𐑑\
+                 : 𐑑 𐑓 𐑨",
                 3,
             ),
-            &["start"],
+            &["𐑕𐑑𐑨𐑓𐑑"],
         );
     }
 
@@ -229,81 +230,81 @@ mod test {
     fn cross() {
         assert_eq!(
             &search(
-                ". . c . .\n\
-                  s t a r t\n\
-                 x x b",
+                " . . 𐑒 . .\
+                 : 𐑕 𐑑 𐑨 𐑓 𐑑\
+                 :𐑿 𐑿 𐑚",
                 3,
             ),
-            &["cab", "start"],
+            &["𐑒𐑨𐑚", "𐑕𐑑𐑨𐑓𐑑"],
         );
     }
 
     #[test]
     fn all_directions() {
-        assert_eq!(&search("start", 3), &["start"]);
-        assert_eq!(&search("trats", 3), &["start"]);
+        assert_eq!(&search("𐑕𐑑𐑨𐑓𐑑", 3), &["𐑕𐑑𐑨𐑓𐑑"]);
+        assert_eq!(&search("𐑑𐑓𐑨𐑑𐑕", 3), &["𐑕𐑑𐑨𐑓𐑑"]);
 
         assert_eq!(
             &search(
-                "s x x\n\
-                  t x x\n\
-                 x a x\n\
-                  x r x\n\
-                 x x t",
+                " 𐑕 x x\
+                 : 𐑑 x x\
+                 :x 𐑨 x\
+                 : x 𐑓 x\
+                 :x x 𐑑",
                 3,
             ),
-            &["start"]);
+            &["𐑕𐑑𐑨𐑓𐑑"]);
         assert_eq!(
             &search(
-                "x x s\n\
-                  x t x\n\
-                 x a x\n\
-                  r x x\n\
-                 t x x",
+                " x x 𐑕\
+                 : x 𐑑 x\
+                 :x 𐑨 x\
+                 : 𐑓 x x\
+                 :𐑑 x x",
                 3,
             ),
-            &["start"]);
+            &["𐑕𐑑𐑨𐑓𐑑"]);
 
         assert_eq!(
             &search(
-                "t x x\n\
-                  r x x\n\
-                 x a x\n\
-                  x t x\n\
-                 x x s",
+                " 𐑑 x x\
+                 : 𐑓 x x\
+                 :x 𐑨 x\
+                 : x 𐑑 x\
+                 :x x 𐑕",
                 3,
             ),
-            &["start"]);
+            &["𐑕𐑑𐑨𐑓𐑑"]);
         assert_eq!(
             &search(
-                "x x t\n\
-                  x r x\n\
-                 x a x\n\
-                  t x x\n\
-                 s x x",
+                " x x 𐑑\
+                 : x 𐑓 x\
+                 :x 𐑨 x\
+                 : 𐑑 x x\
+                 :𐑕 x x",
                 3,
             ),
-            &["start"]);
+            &["𐑕𐑑𐑨𐑓𐑑"]);
     }
 
     #[test]
     fn minimum_length() {
-        assert!(&search("cab", 4).is_empty());
-        assert_eq!(&search("cab", 3), &["cab"]);
+        assert!(&search("𐑒𐑨𐑚", 4).is_empty());
+        assert_eq!(&search("𐑒𐑨𐑚", 3), &["𐑒𐑨𐑚"]);
     }
 
     #[test]
     fn visits() {
         let grid = Grid::new(
-            "s t x\n\
-              a r x\n\
-             c b t"
+            " 𐑕 𐑑 x\
+             : 𐑨 𐑓 x\
+             :𐑒 𐑚 𐑑"
         ).unwrap();
 
         let words = search_words(&grid, &make_dictionary(), 3);
 
-        assert!(words.contains("start"));
-        assert!(words.contains("cab"));
+        assert!(words.contains("𐑕𐑑𐑨𐑓𐑑"));
+        assert!(words.contains("𐑒𐑨𐑚"));
 
         let counts = count_visits(&grid, words.iter());
 

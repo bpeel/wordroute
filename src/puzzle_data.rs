@@ -127,10 +127,10 @@ mod test {
         assert_eq!(puzzle.grid.at(0, 0), '𐑖');
         assert!(&puzzle.words.is_empty());
 
-        let puzzle = "ab:cb,arm,noggin:b,bum:x".parse::<PuzzleData>().unwrap();
+        let puzzle = "AB:CB,arm,noggin:b,bum:x".parse::<PuzzleData>().unwrap();
         assert_eq!(puzzle.grid.width(), 2);
         assert_eq!(puzzle.grid.height(), 2);
-        assert_eq!(puzzle.grid.at(1, 1), 'b');
+        assert_eq!(puzzle.grid.at(1, 1), '𐑑');
         assert_eq!(
             &puzzle.words.iter()
                 .map(|(w, t)| (w.as_str(), *t))

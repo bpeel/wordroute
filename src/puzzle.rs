@@ -565,7 +565,7 @@ mod test {
 
     fn four_line_puzzle() -> Puzzle {
         let grid = Grid::new(
-            "potatostompwhips\n\
+            "𐑐𐑩𐑑𐑱𐑑𐑴𐑕𐑑𐑪𐑥𐑐𐑢𐑪𐑓𐑩𐑤\n\
              abcdefghijklmnop\n\
              xxxxxxxxxxxxxxxx\n\
              yyyyyyyyyyyyyyyy"
@@ -574,9 +574,9 @@ mod test {
         Puzzle::new(PuzzleData {
             grid,
             words: vec![
-                ("potato".to_string(), WordType::Normal),
-                ("stomp".to_string(), WordType::Normal),
-                ("whips".to_string(), WordType::Normal),
+                ("𐑐𐑩𐑑𐑱𐑑𐑴".to_string(), WordType::Normal),
+                ("𐑕𐑑𐑪𐑥𐑐".to_string(), WordType::Normal),
+                ("𐑢𐑪𐑓𐑩𐑤".to_string(), WordType::Normal),
                 (
                     "paobtcadteofsgthoimjpkwlhminposp".to_string(),
                     WordType::Bonus,
@@ -622,12 +622,12 @@ mod test {
 
         assert_eq!(&puzzle.word_lists(), &[5, 6, 32]);
 
-        puzzle.score_word("potato");
+        puzzle.score_word("𐑐𐑩𐑑𐑱𐑑𐑴");
 
         assert_eq!(puzzle.changed_hint_level().unwrap(), 1);
         assert!(puzzle.changed_hint_level().is_none());
 
-        puzzle.score_word("stomp");
+        puzzle.score_word("𐑕𐑑𐑪𐑥𐑐");
 
         assert_eq!(puzzle.changed_hint_level().unwrap(), 2);
         assert!(puzzle.changed_hint_level().is_none());
@@ -700,7 +700,7 @@ mod test {
         );
         assert!(puzzle.changed_save_state().is_none());
 
-        puzzle.score_word("whips");
+        puzzle.score_word("𐑢𐑪𐑓𐑩𐑤");
         assert_eq!(
             puzzle.changed_save_state().unwrap().to_string(),
             "1.1.9",
@@ -732,7 +732,7 @@ mod test {
 
         assert!(
             puzzle.words.iter().find(|&(key, word)| {
-                key == "potato" && word.found
+                key == "𐑐𐑩𐑑𐑱𐑑𐑴" && word.found
             }).is_some()
         );
 
@@ -768,26 +768,21 @@ mod test {
     }
 
     fn wordy_puzzle() -> Puzzle {
-        let grid = Grid::new(".or\nabe\n.ts").unwrap();
-
-        Puzzle::new(PuzzleData {
-            grid,
-            words: vec![
-                ("bats".to_string(), WordType::Normal),
-                ("best".to_string(), WordType::Normal),
-                ("boat".to_string(), WordType::Normal),
-                ("boats".to_string(), WordType::Normal),
-                ("bore".to_string(), WordType::Normal),
-                ("bores".to_string(), WordType::Normal),
-                ("brest".to_string(), WordType::Excluded),
-                ("estab".to_string(), WordType::Bonus),
-                ("oats".to_string(), WordType::Normal),
-                ("robe".to_string(), WordType::Normal),
-                ("robes".to_string(), WordType::Normal),
-                ("robs".to_string(), WordType::Normal),
-                ("sebat".to_string(), WordType::Bonus),
-            ]
-        })
+        Puzzle::new(
+            " . 𐑴 𐑤\
+             : 𐑨 𐑚 𐑧\
+             :. 𐑑 𐑕,\
+             𐑑𐑨𐑚𐑤𐑴:b,\
+             𐑕𐑑𐑨𐑚,\
+             𐑚𐑤𐑧𐑕,\
+             𐑚𐑤𐑧𐑕𐑑,\
+             𐑚𐑧𐑕𐑑,\
+             𐑚𐑧𐑤𐑴,\
+             𐑚𐑨𐑑𐑕,\
+             𐑤𐑧𐑕𐑑,\
+             𐑧𐑤𐑚𐑴:x,\
+             𐑨𐑚𐑧𐑕:b".parse::<PuzzleData>().unwrap()
+        )
     }
 
     #[test]
@@ -797,37 +792,35 @@ mod test {
         assert_eq!(
             puzzle.share_text(12),
             "I played WordRoute #12\n\
-             0/10 words",
+             0/7 words",
         );
 
-        puzzle.score_word("bats");
-        puzzle.score_word("best");
-        puzzle.score_word("estab");
+        puzzle.score_word("𐑕𐑑𐑨𐑚");
+        puzzle.score_word("𐑚𐑤𐑧𐑕");
+        puzzle.score_word("𐑑𐑨𐑚𐑤𐑴");
 
         assert_eq!(
             puzzle.share_text(12),
             "I played WordRoute #12\n\
-             2/10 words (+1 bonus word)",
+             2/7 words (+1 bonus word)",
         );
 
-        puzzle.score_word("sebat");
+        puzzle.score_word("𐑨𐑚𐑧𐑕");
 
         assert_eq!(
             puzzle.share_text(12),
             "I played WordRoute #12\n\
-             2/10 words (+2 bonus words)",
+             2/7 words (+2 bonus words)",
         );
 
-        for word in [
-            "boat", "boats", "bore", "bores", "oats", "robe", "robes", "robs",
-        ].iter() {
+        for word in ["𐑚𐑤𐑧𐑕𐑑", "𐑚𐑧𐑕𐑑", "𐑚𐑧𐑤𐑴", "𐑚𐑨𐑑𐑕", "𐑤𐑧𐑕𐑑"].iter() {
             puzzle.score_word(word);
         }
 
         assert_eq!(
             puzzle.share_text(6),
             "I played WordRoute #6\n\
-             10/10 words (+2 bonus words)\n\
+             7/7 words (+2 bonus words)\n\
              😎 No hints used\n\
              🎯 Perfect accuracy",
         );
@@ -837,18 +830,18 @@ mod test {
         assert_eq!(
             puzzle.share_text(42),
             "I played WordRoute #42\n\
-             10/10 words (+2 bonus words)\n\
+             7/7 words (+2 bonus words)\n\
              🎯 Perfect accuracy",
         );
 
-        for _ in 0..4 {
+        for _ in 0..3 {
             puzzle.score_word("notaword");
         }
 
         assert_eq!(
             puzzle.share_text(42),
             "I played WordRoute #42\n\
-             10/10 words (+2 bonus words)\n\
+             7/7 words (+2 bonus words)\n\
              🎯 75% accuracy",
         );
 
@@ -857,7 +850,7 @@ mod test {
         assert_eq!(
             puzzle.share_text(42),
             "I played WordRoute #42\n\
-             10/10 words (+2 bonus words)",
+             7/7 words (+2 bonus words)",
         );
     }
 
@@ -867,7 +860,7 @@ mod test {
 
         assert!(!puzzle.pending_excluded_word());
 
-        puzzle.score_word("brest");
+        puzzle.score_word("𐑧𐑤𐑚𐑴");
 
         assert!(puzzle.pending_excluded_word());
         assert!(!puzzle.pending_excluded_word());
@@ -877,14 +870,14 @@ mod test {
         // Assert that loading a save state that marks an excluded
         // word as found doesn’t set a pending excluded word.
         puzzle.load_save_state(
-            &"0.0.40".parse::<SaveState>().unwrap(),
+            &"0.0.100".parse::<SaveState>().unwrap(),
         );
 
         assert!(!puzzle.pending_excluded_word());
 
         assert!(
             puzzle.words().find(|(key, word)| {
-                key == &"brest" &&
+                key == &"𐑧𐑤𐑚𐑴" &&
                     word.found &&
                     word.word_type == WordType::Excluded
             }).is_some()
@@ -897,13 +890,13 @@ mod test {
 
         assert!(!puzzle.pending_finish());
 
-        puzzle.score_word("potato");
+        puzzle.score_word("𐑐𐑩𐑑𐑱𐑑𐑴");
         assert!(!puzzle.pending_finish());
 
-        puzzle.score_word("stomp");
+        puzzle.score_word("𐑕𐑑𐑪𐑥𐑐");
         assert!(!puzzle.pending_finish());
 
-        puzzle.score_word("whips");
+        puzzle.score_word("𐑢𐑪𐑓𐑩𐑤");
         assert!(puzzle.pending_finish());
         assert!(!puzzle.pending_finish());
 
@@ -929,17 +922,17 @@ mod test {
         assert_eq!(puzzle.counts.at(0, 0).starts, 0);
         assert_eq!(puzzle.counts.at(0, 0).visits, 0);
 
-        assert_eq!(puzzle.counts.at(1, 0).starts, 1);
-        assert_eq!(puzzle.counts.at(1, 0).visits, 8);
+        assert_eq!(puzzle.counts.at(1, 0).starts, 0);
+        assert_eq!(puzzle.counts.at(1, 0).visits, 1);
 
-        assert_eq!(puzzle.counts.at(2, 0).starts, 3);
-        assert_eq!(puzzle.counts.at(2, 0).visits, 5);
+        assert_eq!(puzzle.counts.at(2, 0).starts, 1);
+        assert_eq!(puzzle.counts.at(2, 0).visits, 4);
 
         assert_eq!(puzzle.counts.at(0, 1).starts, 0);
-        assert_eq!(puzzle.counts.at(0, 1).visits, 4);
+        assert_eq!(puzzle.counts.at(0, 1).visits, 2);
 
-        assert_eq!(puzzle.counts.at(1, 1).starts, 6);
-        assert_eq!(puzzle.counts.at(1, 1).visits, 9);
+        assert_eq!(puzzle.counts.at(1, 1).starts, 5);
+        assert_eq!(puzzle.counts.at(1, 1).visits, 6);
 
         assert_eq!(puzzle.counts.at(2, 1).starts, 0);
         assert_eq!(puzzle.counts.at(2, 1).visits, 5);
@@ -950,7 +943,7 @@ mod test {
         assert_eq!(puzzle.counts.at(1, 2).starts, 0);
         assert_eq!(puzzle.counts.at(1, 2).visits, 5);
 
-        assert_eq!(puzzle.counts.at(2, 2).starts, 0);
-        assert_eq!(puzzle.counts.at(2, 2).visits, 7);
+        assert_eq!(puzzle.counts.at(2, 2).starts, 1);
+        assert_eq!(puzzle.counts.at(2, 2).visits, 6);
     }
 }
