@@ -20,19 +20,14 @@ mod dictionary;
 mod directions;
 mod word_finder;
 mod counts;
+mod puzzle_data;
 
 use std::path::Path;
 use std::io::{BufReader, BufRead};
 use std::{fs, process::ExitCode, ffi::OsString};
 use clap::Parser;
 use std::collections::HashSet;
-
-#[derive(PartialEq, Eq, Clone, Copy)]
-enum WordType {
-    Normal,
-    Bonus,
-    Excluded,
-}
+use puzzle_data::{PuzzleData, WordType};
 
 #[derive(Parser)]
 #[command(name = "Build")]
@@ -75,15 +70,14 @@ fn print_grid(grid: &grid::Grid, counts: &counts::GridCounts) {
 }
 
 fn print_human_readable(
-    grid: &grid::Grid,
+    puzzle_data: PuzzleData,
     counts: &counts::GridCounts,
-    words: Vec<(String, WordType)>,
 ) {
-    print_grid(&grid, &counts);
+    print_grid(&puzzle_data.grid, counts);
 
     println!();
 
-    for (word, word_type) in words.into_iter() {
+    for (word, word_type) in puzzle_data.words.into_iter() {
         print!("{}", &word);
 
         match word_type {
@@ -98,40 +92,6 @@ fn print_human_readable(
 
         println!();
     }
-}
-
-fn print_json(
-    grid: &grid::Grid,
-    words: Vec<(String, WordType)>,
-) {
-    print!("{{\"grid\":\"");
-
-    for y in 0..grid.height() {
-        for x in 0..grid.width() {
-            print!("{}", grid.at(x, y));
-        }
-        if y < grid.height() - 1 {
-            print!("\\n");
-        }
-    }
-
-    print!("\",\"words\":{{");
-
-    for (i, (word, word_type)) in words.into_iter().enumerate() {
-        if i != 0 {
-            print!(",");
-        }
-
-        let word_type = match word_type {
-            WordType::Normal => 0,
-            WordType::Bonus => 1,
-            WordType::Excluded => 2,
-        };
-
-        print!("\"{}\":{}", word, word_type);
-    }
-
-    println!("}}}}");
 }
 
 fn read_word_list_from_file<P: AsRef<Path>>(
@@ -236,17 +196,19 @@ fn main() -> ExitCode {
 
     words.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
 
+    let puzzle_data = PuzzleData { grid, words };
+
     if cli.human_readable {
         let counts = build::count_visits(
-            &grid,
-            words.iter().filter_map(|&(ref word, word_type)| {
+            &puzzle_data.grid,
+            puzzle_data.words.iter().filter_map(|&(ref word, word_type)| {
                 (word_type == WordType::Normal).then_some(word)
             })
         );
 
-        print_human_readable(&grid, &counts, words);
+        print_human_readable(puzzle_data, &counts);
     } else {
-        print_json(&grid, words);
+        println!("{}", puzzle_data);
     }
 
     ExitCode::SUCCESS
