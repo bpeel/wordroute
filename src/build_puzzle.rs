@@ -45,8 +45,8 @@ struct Cli {
     excluded_words: Vec<OsString>,
     #[arg(short, long, value_name = "LENGTH", default_value_t = 4)]
     minimum_length: usize,
-    #[arg(short, long)]
-    text: bool,
+    #[arg(short = 'H', long)]
+    human_readable: bool,
 }
 
 fn print_grid(grid: &grid::Grid, counts: &counts::GridCounts) {
@@ -74,7 +74,7 @@ fn print_grid(grid: &grid::Grid, counts: &counts::GridCounts) {
     }
 }
 
-fn print_text(
+fn print_human_readable(
     grid: &grid::Grid,
     counts: &counts::GridCounts,
     words: Vec<(String, WordType)>,
@@ -236,7 +236,7 @@ fn main() -> ExitCode {
 
     words.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
 
-    if cli.text {
+    if cli.human_readable {
         let counts = build::count_visits(
             &grid,
             words.iter().filter_map(|&(ref word, word_type)| {
@@ -244,7 +244,7 @@ fn main() -> ExitCode {
             })
         );
 
-        print_text(&grid, &counts, words);
+        print_human_readable(&grid, &counts, words);
     } else {
         print_json(&grid, words);
     }
