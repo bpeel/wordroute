@@ -16,7 +16,6 @@
 
 use wasm_bindgen::prelude::*;
 use web_sys::console;
-use super::grid::Grid;
 use super::grid_math::Geometry;
 use super::word_finder;
 use super::directions;
@@ -24,7 +23,6 @@ use super::puzzle::{Puzzle, N_HINT_LEVELS};
 use super::puzzle_data::{PuzzleData, WordType};
 use super::save_state::{self, SaveState};
 use std::fmt::Write;
-use js_sys::Reflect;
 use std::f32::consts::PI;
 use std::collections::{hash_map, HashMap};
 
@@ -149,7 +147,7 @@ impl Loader {
     }
 
     fn queue_data_load(&mut self) {
-        let filename = "puzzles.json";
+        let filename = "puzzles.txt";
 
         let floating_pointer = self.floating_pointer.unwrap();
 
@@ -162,7 +160,7 @@ impl Loader {
             };
 
             let response: web_sys::Response = v.dyn_into().unwrap();
-            let promise = match response.json() {
+            let promise = match response.array_buffer() {
                 Ok(p) => p,
                 Err(_) => {
                     show_error("Error fetching json from data");
@@ -176,8 +174,10 @@ impl Loader {
         });
 
         let content_closure = PromiseClosure::new(move |v| {
+            let data = js_sys::Uint8Array::new(&v).to_vec();
+
             unsafe {
-                (*floating_pointer).data_loaded(v);
+                (*floating_pointer).data_loaded(data);
             }
         });
 
@@ -203,7 +203,7 @@ impl Loader {
         self.data_error_closure = Some(error_closure);
     }
 
-    fn data_loaded(&mut self, data: JsValue) {
+    fn data_loaded(&mut self, data: Vec<u8>) {
         match parse_puzzles(data) {
             Err(_) => {
                 self.stop_floating();
@@ -1488,89 +1488,32 @@ fn hexagon_path(radius: f32) -> String {
     result
 }
 
-fn parse_words(data: &JsValue) -> Result<Vec<(String, WordType)>, ()> {
-    let Ok(words_object) = Reflect::get(&data, &"words".into())
-        .map_err(|_| ())
-        .and_then(|v| TryInto::<js_sys::Object>::try_into(v).map_err(|_| ()))
+fn parse_puzzles(data: Vec<u8>) -> Result<Vec<PuzzleData>, ()> {
+    let Ok(data) = std::str::from_utf8(&data)
     else {
-        show_error("Error getting word list");
-        return Err(());
-    };
-
-    let words_array = js_sys::Object::keys(&words_object);
-
-    let mut words = Vec::new();
-
-    for i in 0..words_array.length() {
-        let word_value = words_array.get(i);
-
-        let Some(type_num) = Reflect::get(&words_object, &word_value)
-            .ok()
-            .and_then(|v| v.as_f64())
-        else {
-            show_error("Word type is not a float");
-            return Err(());
-        };
-
-        let Ok(word) = TryInto::<String>::try_into(word_value)
-        else {
-            show_error("Error getting word from the list");
-            return Err(());
-        };
-
-        let word_type = if type_num == 0.0 {
-            WordType::Normal
-        } else if type_num == 1.0 {
-            WordType::Bonus
-        } else if type_num == 2.0 {
-            WordType::Excluded
-        } else {
-            show_error("Unknown word type");
-            return Err(());
-        };
-
-        words.push((word, word_type));
-    }
-
-    Ok(words)
-}
-
-fn parse_puzzle(data: JsValue) -> Result<PuzzleData, ()> {
-    let Ok(grid_str) = Reflect::get(&data, &"grid".into())
-        .map_err(|_| ())
-        .and_then(|v| TryInto::<String>::try_into(v).map_err(|_| ()))
-    else {
-        show_error("Error getting puzzle grid");
-        return Err(())
-    };
-
-    let grid = match Grid::new(&grid_str) {
-        Ok(g) => g,
-        Err(e) => {
-            show_error(&e.to_string());
-            return Err(());
-        },
-    };
-
-    let words = parse_words(&data)?;
-
-    Ok(PuzzleData {
-        grid,
-        words,
-    })
-}
-
-fn parse_puzzles(data: JsValue) -> Result<Vec<PuzzleData>, ()> {
-    let Ok(puzzle_array) = TryInto::<js_sys::Array>::try_into(data)
-    else {
-        show_error("Error getting puzzle array");
+        show_error("Puzzle data contains invalid UTF-8");
         return Err(());
     };
 
     let mut puzzles = Vec::new();
 
-    for data in puzzle_array.iter() {
-        puzzles.push(parse_puzzle(data)?);
+    for (line_num, line) in data.lines().enumerate() {
+        match line.parse::<PuzzleData>() {
+            Ok(puzzle) => puzzles.push(puzzle),
+            Err(e) => {
+                show_error(&format!(
+                    "puzzles.txt: line {}: {}",
+                    line_num + 1,
+                    e,
+                ));
+                return Err(());
+            },
+        }
+    }
+
+    if puzzles.is_empty() {
+        show_error("puzzles.txt is empty");
+        return Err(());
     }
 
     Ok(puzzles)

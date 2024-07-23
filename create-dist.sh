@@ -7,7 +7,7 @@ files=(
     "example-word.svg"
     "favicon.ico"
     "index.html"
-    "puzzles.json"
+    "puzzles.txt"
 )
 
 included_files=(
