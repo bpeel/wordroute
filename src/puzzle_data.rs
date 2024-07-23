@@ -17,6 +17,7 @@
 use std::fmt;
 use std::str::FromStr;
 use super::grid::{self, Grid};
+use super::shavicode;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum WordType {
@@ -80,7 +81,11 @@ impl fmt::Display for PuzzleData {
         self.grid.fmt(f)?;
 
         for (word, word_type) in self.words.iter() {
-            write!(f, ",{}", word)?;
+            write!(f, ",")?;
+
+            for ch in word.chars() {
+                write!(f, "{}", shavicode::encode_char(ch))?;
+            }
 
             match word_type {
                 WordType::Normal => (),
@@ -95,7 +100,7 @@ impl fmt::Display for PuzzleData {
 
 fn parse_word(s: &str) -> Result<(String, WordType), Error> {
     let (word, word_type) = match s.split_once(':') {
-        None => (s.to_string(), WordType::Normal),
+        None => (shavicode::decode_str(s), WordType::Normal),
         Some((word, word_type)) => {
             let word_type = match word_type {
                 "b" => WordType::Bonus,
@@ -103,7 +108,7 @@ fn parse_word(s: &str) -> Result<(String, WordType), Error> {
                 _ => return Err(Error::InvalidWordType),
             };
 
-            (word.to_string(), word_type)
+            (shavicode::decode_str(word), word_type)
         }
     };
 
@@ -127,7 +132,7 @@ mod test {
         assert_eq!(puzzle.grid.at(0, 0), '𐑖');
         assert!(&puzzle.words.is_empty());
 
-        let puzzle = "AB:CB,arm,noggin:b,bum:x".parse::<PuzzleData>().unwrap();
+        let puzzle = "AB:CB,𐑓j𐑑,𐑯𐑪𐑜𐑦𐑯:b,KjV:x".parse::<PuzzleData>().unwrap();
         assert_eq!(puzzle.grid.width(), 2);
         assert_eq!(puzzle.grid.height(), 2);
         assert_eq!(puzzle.grid.at(1, 1), '𐑑');
@@ -136,9 +141,9 @@ mod test {
                 .map(|(w, t)| (w.as_str(), *t))
                 .collect::<Vec<(&str, _)>>(),
             &[
-                ("arm", WordType::Normal),
-                ("noggin", WordType::Bonus),
-                ("bum", WordType::Excluded),
+                ("𐑓𐑳𐑑", WordType::Normal),
+                ("𐑯𐑪𐑜𐑦𐑯", WordType::Bonus),
+                ("𐑚𐑳𐑥", WordType::Excluded),
             ],
         );
     }
