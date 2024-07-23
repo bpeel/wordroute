@@ -32,3 +32,5 @@ mod save_state;
 mod puzzle;
 #[cfg(any(target_arch = "wasm32", test))]
 mod puzzle_data;
+#[cfg(any(target_arch = "wasm32", test))]
+mod shavicode;

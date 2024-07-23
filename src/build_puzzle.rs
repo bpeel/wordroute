@@ -21,6 +21,7 @@ mod directions;
 mod word_finder;
 mod counts;
 mod puzzle_data;
+mod shavicode;
 
 use std::path::Path;
 use std::io::{BufReader, BufRead};
