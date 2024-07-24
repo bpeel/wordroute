@@ -33,6 +33,8 @@ use puzzle_data::{PuzzleData, WordType};
 #[derive(Parser)]
 #[command(name = "Build")]
 struct Cli {
+    #[arg(required = true, value_name = "PUZZLE")]
+    puzzles: Vec<OsString>,
     #[arg(short, long, value_name = "FILE")]
     dictionary: OsString,
     #[arg(short, long, value_name = "FILE")]
@@ -165,51 +167,53 @@ fn main() -> ExitCode {
 
     let dictionary = dictionary::Dictionary::new(dictionary.into_boxed_slice());
 
-    let grid_string = match std::io::read_to_string(std::io::stdin()) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("stdin: {}", e);
-            return ExitCode::FAILURE;
-        },
-    };
+    for filename in cli.puzzles.iter() {
+        let grid_string = match std::fs::read_to_string(filename) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("{}: {}", filename.to_string_lossy(), e);
+                return ExitCode::FAILURE;
+            },
+        };
 
-    let grid = match grid::Grid::new(&grid_string) {
-        Ok(g) => g,
-        Err(e) => {
-            eprintln!("stdin: {}", e);
-            return ExitCode::FAILURE;
-        },
-    };
+        let grid = match grid::Grid::new(&grid_string) {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("{}: {}", filename.to_string_lossy(), e);
+                return ExitCode::FAILURE;
+            },
+        };
 
-    let words = build::search_words(&grid, &dictionary, cli.minimum_length);
-    let mut words = words.into_iter()
-        .map(|word| {
-            let word_type = if excluded_words.contains(&word) {
-                WordType::Excluded
-            } else if bonus_words.contains(&word) {
-                WordType::Bonus
-            } else {
-                WordType::Normal
-            };
-            (word, word_type)
-        })
-        .collect::<Vec<(String, WordType)>>();
-
-    words.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
-
-    let puzzle_data = PuzzleData { grid, words };
-
-    if cli.human_readable {
-        let counts = build::count_visits(
-            &puzzle_data.grid,
-            puzzle_data.words.iter().filter_map(|&(ref word, word_type)| {
-                (word_type == WordType::Normal).then_some(word)
+        let words = build::search_words(&grid, &dictionary, cli.minimum_length);
+        let mut words = words.into_iter()
+            .map(|word| {
+                let word_type = if excluded_words.contains(&word) {
+                    WordType::Excluded
+                } else if bonus_words.contains(&word) {
+                    WordType::Bonus
+                } else {
+                    WordType::Normal
+                };
+                (word, word_type)
             })
-        );
+            .collect::<Vec<(String, WordType)>>();
 
-        print_human_readable(puzzle_data, &counts);
-    } else {
-        println!("{}", puzzle_data);
+        words.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+
+        let puzzle_data = PuzzleData { grid, words };
+
+        if cli.human_readable {
+            let counts = build::count_visits(
+                &puzzle_data.grid,
+                puzzle_data.words.iter().filter_map(|&(ref word, word_type)| {
+                    (word_type == WordType::Normal).then_some(word)
+                })
+            );
+
+            print_human_readable(puzzle_data, &counts);
+        } else {
+            println!("{}", puzzle_data);
+        }
     }
 
     ExitCode::SUCCESS
