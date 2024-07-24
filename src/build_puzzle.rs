@@ -27,7 +27,7 @@ use std::path::Path;
 use std::io::{BufReader, BufRead};
 use std::{fs, process::ExitCode, ffi::OsString};
 use clap::Parser;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use puzzle_data::{PuzzleData, WordType};
 
 #[derive(Parser)]
@@ -78,22 +78,76 @@ fn print_human_readable(
 ) {
     print_grid(&puzzle_data.grid, counts);
 
-    println!();
+    // Split the words into buckets. There will be one for each length
+    // of normal word, and one for all lengths of each other type of
+    // word.
+
+    let mut buckets = HashMap::new();
 
     for (word, word_type) in puzzle_data.words.into_iter() {
-        print!("{}", &word);
+        let key = if word_type == WordType::Normal {
+            (word.chars().count(), WordType::Normal as u8)
+        } else {
+            (0, word_type as u8)
+        };
 
-        match word_type {
-            WordType::Normal => (),
-            WordType::Bonus => {
-                print!(" (bonus)");
-            },
-            WordType::Excluded => {
-                print!(" (excluded)");
-            },
+        buckets.entry(key)
+            .or_insert_with(|| Vec::new())
+            .push(word);
+    }
+
+    let mut lengths = buckets.keys().filter_map(|&(length, word_type)| {
+        (word_type == WordType::Normal as u8).then_some(length)
+    }).collect::<Vec::<usize>>();
+
+    lengths.sort_unstable();
+
+    for length in lengths.into_iter() {
+        println!("\n{} letters\n", length);
+
+        let mut words = buckets.remove(&(length, WordType::Normal as u8))
+            .unwrap();
+
+        words.sort_unstable();
+
+        let mut x = 0;
+
+        for word in words.into_iter() {
+            let spaces = (x == 0) as usize;
+
+            if x + spaces + length > 80 {
+                println!();
+                x = 0;
+            }
+
+            if x != 0 {
+                print!(" ");
+            }
+
+            print!("{}", word);
+
+            x += length + spaces;
         }
 
         println!();
+    }
+
+    if let Some(bonus_words) = buckets.remove(&(0, WordType::Bonus as u8)) {
+        println!("\nBonus words\n");
+
+        for word in bonus_words.into_iter() {
+            println!("{}", word);
+        }
+    }
+
+    if let Some(excluded_words) =
+        buckets.remove(&(0, WordType::Excluded as u8))
+    {
+        println!("\nExcluded words\n");
+
+        for word in excluded_words.into_iter() {
+            println!("{}", word);
+        }
     }
 }
 
